@@ -6,6 +6,7 @@ week and the global lists' latest week (country "Global", iso2 "ZZ"), top 5 film
 Usage: netflix_top10.py OUT.tsv   (run weekly by .github/workflows/pages.yml; no key needed)
 """
 import csv
+import http.client
 import io
 import sys
 import urllib.request
@@ -15,14 +16,22 @@ EACH = 5
 
 
 def fetch(name):
-    for attempt in range(4):
+    """The whole file: Netflix's server often cuts a long download, so it is read on from where it stopped (Range)."""
+    data = b""
+    for attempt in range(40):
+        req = urllib.request.Request(BASE + name, headers={"User-Agent": "vyro-top10", "Range": "bytes=%d-" % len(data)})
         try:
-            req = urllib.request.Request(BASE + name, headers={"User-Agent": "vyro-top10"})
             with urllib.request.urlopen(req, timeout=120) as r:
-                return io.StringIO(r.read().decode("utf-8"))
+                if r.status == 200 and data:   # the server ignored the range: start again
+                    data = b""
+                data += r.read()
+            return io.StringIO(data.decode("utf-8"))
+        except http.client.IncompleteRead as e:
+            data += e.partial
         except Exception:
-            if attempt == 3:
+            if attempt >= 5:
                 raise
+    raise IOError("gave up on " + name)
 
 
 def best(rows):
