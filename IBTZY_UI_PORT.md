@@ -228,3 +228,4 @@ serial worker; "Picks from" lookups are memoised per settings change (`Recs.hidd
 - Release v1.0.0 (versionCode 10) built with --generic: no API keys, Games off.
 - LG/Samsung: display name VYRO; Tizen package id and docs/ (upstream site) unchanged.
 - 1.0.1: Home grid without a TMDB key (picksOn always on; Movies tab needs the key); VYRO grants itself READ_TV_LISTINGS + usage access + TCL AUTO_START from :home via the TV ADB (prompt accepted once). TV: grid verified (15 titles, Prime + Crunchyroll). Old io.freemytv and io.ibtzy.tvlauncher removed from the TV.
+- 1.0.2 (pushed, not released): HomeActivity.handOffHome — as HOME without being the chosen home (boot with Google TV as default; locked-boot start because VYRO is direct-boot aware), hands to the TV home and closes; checked again at unlock. TV: HOME-intent hand-off verified; reboot not yet verified.

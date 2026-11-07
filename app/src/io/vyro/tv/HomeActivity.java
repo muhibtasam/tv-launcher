@@ -29,6 +29,7 @@ public class HomeActivity extends Activity {
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (handOffHome(getIntent())) return;
         UserManager um = getSystemService(UserManager.class);
         if (um != null && !um.isUserUnlocked()) {
             // Power-on, the storage still locked: Android starts us now (direct-boot aware) instead of its black
@@ -82,6 +83,9 @@ public class HomeActivity extends Activity {
         }
         unlock = null;
         if (isFinishing() || isDestroyed()) return;
+        // Android starts us while the storage is locked because we're direct-boot aware and the TV's own home isn't:
+        // now that it's unlocked, the TV's chosen home screen gets the screen back (handOffHome).
+        if (handOffHome(getIntent())) return;
         // Android reads each settings file in its own background thread from the first request: all of them now, so
         // they load side by side while the main settings are read below (each read waits only for its own file).
         for (String file : new String[] {"homedata", "recs", "recs-history", "home-ui", "apps-history", "title-links-2"}) {
@@ -194,8 +198,43 @@ public class HomeActivity extends Activity {
     /** Opens All Apps (a remote's All Apps button, RemoteKeys). */
     static final String EXTRA_ALL_APPS = "io.vyro.tv.ALL_APPS", EXTRA_UPDATE = "io.vyro.tv.UPDATE";
 
+    /**
+     * VYRO came up as Home (HOME's intent) without being the TV's chosen home screen: at power-on with no default set,
+     * or the Home button with Android's own choice elsewhere. In Original mode the TV's own home screen opens instead,
+     * and this one closes. When VYRO is the chosen home (Free mode: set-home-activity) or opened as an app, it stays.
+     */
+    private boolean handOffHome(Intent intent) {
+        if (intent == null || !intent.hasCategory(Intent.CATEGORY_HOME)) return false;
+        android.content.pm.PackageManager pm = getPackageManager();
+        Intent homeIntent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+        android.content.pm.ResolveInfo chosen = pm.resolveActivity(homeIntent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
+        if (chosen != null && chosen.activityInfo != null && getPackageName().equals(chosen.activityInfo.packageName)) return false;
+        android.content.pm.ActivityInfo other = null;
+        for (android.content.pm.ResolveInfo r : pm.queryIntentActivities(homeIntent, 0)) {
+            android.content.pm.ActivityInfo ai = r.activityInfo;
+            if (ai == null || getPackageName().equals(ai.packageName) || "android".equals(ai.packageName)) continue;
+            if ("com.android.tv.settings".equals(ai.packageName) || ai.packageName.contains("setupwraith")) continue;   // fallbacks, not a home
+            boolean system = (ai.applicationInfo.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0;
+            boolean google = "com.google.android.apps.tv.launcherx".equals(ai.packageName);
+            if (other == null || google || (system && (other.applicationInfo.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) == 0)) other = ai;
+            if (google) break;
+        }
+        if (other == null) return false;   // no other home screen on this TV: VYRO it is
+        try {
+            startActivity(new Intent(homeIntent).setClassName(other.packageName, other.name)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
+            AppLog.w("home: not the TV's chosen home screen, handed to " + other.packageName);
+            finish();
+            return true;
+        } catch (RuntimeException e) {
+            AppLog.w("home: couldn't hand to " + other.packageName + ": " + e.getMessage());
+            return false;
+        }
+    }
+
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        if (handOffHome(intent)) return;
         if (home == null) return;
         if (intent.getBooleanExtra(EXTRA_ALL_APPS, false)) home.showAllApps();
         if (home != null && intent.getBooleanExtra(EXTRA_UPDATE, false)) home.showUpdateNow();   // Settings › Updates
