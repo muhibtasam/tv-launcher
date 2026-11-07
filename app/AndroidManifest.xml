@@ -19,6 +19,21 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- "Continue watching": what you left half-way in your apps, from Android TV's own Watch Next list. -->
     <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
+    <!-- Your own screensaver photos from /sdcard/Screensaver (DreamView), and Most used in Apps (UsageStats, granted
+         through the TV's own ADB). -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
+    <!-- The Wi-Fi and Bluetooth buttons show whether each is on (read only: they open the system settings). -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- The Control Center's AirPlay tile: the TV's built-in AirPlay is a system app or settings screen, often with no
+         launcher icon, which the <queries> below can't see. Sideloaded app: no store policy applies. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- MediaTek's AirPlay screen (TCL's built-in AirPlay) requires it to be opened. -->
+    <uses-permission android:name="com.mediatek.permission.AirPlay.BroadCast" />
+    <!-- Granted through the TV's own ADB in Free My TV mode (pm grant): the remote buttons' accessibility service is put
+         back directly when Android drops it (ServiceRepair). Never granted otherwise. -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
     <!-- The Bluetooth status icon: whether headphones or a speaker are connected. Before Android 12 the permission is
          granted at install; from 12 it is asked for when Status icons is turned on (and only the icon needs it). -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
@@ -28,6 +43,30 @@
          returns null). The shelf and streaming apps, the live TV apps and, through the <intent>, every TV app
          (for "All Apps"). -->
     <queries>
+        <!-- The Wi-Fi and Bluetooth buttons look up the TV's settings pages (HomeApps.systemPage). -->
+        <intent>
+            <action android:name="android.settings.WIFI_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.BLUETOOTH_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.SETTINGS" />
+        </intent>
+        <!-- Apps: the app store that can search for an app that isn't installed, the speech recognizer for voice search,
+             and a browser for Google Play's search page. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="market" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
         <!-- Optional App Store top button: Google Play or Amazon Appstore. -->
         <package android:name="com.android.vending" />
         <package android:name="com.amazon.venezia" />
@@ -145,6 +184,7 @@
             android:name=".HomeActivity"
             android:process=":home"
             android:exported="true"
+            android:directBootAware="true"
             android:label="Free My TV"
             android:launchMode="singleTask"
             android:taskAffinity=""

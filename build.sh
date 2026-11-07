@@ -57,9 +57,18 @@ else
   CURRENCY="$(prop currency USD)"
 fi
 ASSIST=false; [ "$(prop disable_assistant false)" = "true" ] && ASSIST=true
-CRYPTO=false; [ "$(prop show_crypto true)" = "true" ] && CRYPTO=true
+# The Ibtzy design: no prices unless asked for (Home Settings > Quotes widget, or show_crypto=true), dark unless
+# Light is picked.
+CRYPTO=false; [ "$(prop show_crypto false)" = "true" ] && CRYPTO=true
 ANIMATION=false; [ "$(prop hide_animation false)" = "true" ] && ANIMATION=true
 SAVER=true; [ "$(prop screensaver true)" = "false" ] && SAVER=false
+TMOVIES=true; [ "$(prop tab_movies true)" = "false" ] && TMOVIES=false
+# Games reads stores and wikis beyond the sources the release talks to (Steam, PlayStation Store, Wikipedia, and
+# IGDB, RAWG, SteamGridDB and OpenCritic with their keys): off in the --generic release until turned on (Settings > Tabs).
+TGAMES=true; [ "$(prop tab_games true)" = "false" ] && TGAMES=false
+if $GENERIC; then TGAMES=false; fi
+TAPPS=true; [ "$(prop tab_apps true)" = "false" ] && TAPPS=false
+MOSTUSED=true; [ "$(prop shelf_most_used true)" = "false" ] && MOSTUSED=false
 STREMIO=false; [ "$(prop open_in_stremio false)" = "true" ] && STREMIO=true
 
 # Servers on your own network (Immich, and the next feature that needs one) often answer in plain HTTP. One rule for
@@ -120,6 +129,14 @@ final class Config {
     static final String PLEX_URL = "$(prop plex_url '')";
     static final String PLEX_TOKEN = "$(prop plex_token '')";
     static final String TRAKT_CLIENT_ID = "$(prop trakt_client_id '')";
+    static final String RAWG_KEY = "$(prop rawg_key '')";
+    static final String STEAMGRIDDB_KEY = "$(prop steamgriddb_key '')";
+    static final String OPENCRITIC_KEY = "$(prop opencritic_key '')";
+    static final String TWITCH_CLIENT_ID = "$(prop twitch_client_id '')";
+    static final String TWITCH_CLIENT_SECRET = "$(prop twitch_client_secret '')";
+    static final boolean TAB_MOVIES = $TMOVIES, TAB_GAMES = $TGAMES, TAB_APPS = $TAPPS;
+    static final boolean SHELF_MOST_USED = $MOSTUSED;
+    static final String SHELF_APPS = "$(prop shelf_apps '')";
     static final String TMDB_REGION = "$REGION";
     static final String LATITUDE = "$LAT";
     static final String LONGITUDE = "$LON";
@@ -128,7 +145,7 @@ final class Config {
     static final String CURRENCY = "$CURRENCY";
     static final String TEMPERATURE = "$(prop temperature auto)";
     static final String HIDE_SERVICES = "$(prop hide_services '')";
-    static final String THEME = "$(prop theme auto)";
+    static final String THEME = "$(prop theme dark)";
     static final String IMMICH_SERVER = "$(prop immich_server '')";
     static final String HA_URL = "$(prop home_assistant_url '')";
     static final String HA_ENTITIES = "$(prop home_assistant_entities '')";

@@ -112,7 +112,7 @@ final class HomeMode {
      * your brand's, see the README). The TV's own home screen and screensaver are added at switch time.
      */
     static final String[] DEBLOAT = {
-        "com.google.android.play.games", "com.google.android.youtube.tvmusic",        // Play Games, YouTube Music
+        "com.google.android.play.games",                                              // Play Games (YouTube Music stays: it's on the dock)
         // TCL
         "com.tcl.magiconnectfree", "com.tcl.miracast",                                // screen mirroring apps
         "com.tcl.messagebox", "com.tcl.usercenter",                                   // TCL messages and account
@@ -143,6 +143,7 @@ final class HomeMode {
 
     /** Never turned off, not even by mistake (picture, sound, inputs, remote, store). Checked before every disable. */
     private static final Set<String> PROTECTED = new HashSet<>(Arrays.asList(
+        "com.google.android.youtube.tvmusic",   // YouTube Music: on the dock
         "com.tcl.ttvs", "com.tvos", "com.tcl.systemserver", "com.tcl.systemui.plugin", "com.tcl.tv", "com.tcl.tvinput",
         "com.tcl.hearaid", "com.dolby.android.audio.service", "com.tcl.globalkeyoverlay", "com.tcl.autopair",
         "com.tcl.UpdatePeripheral", "com.tcl.dashboard", "com.tcl.suspension", "com.tcl.providers.config",
@@ -434,6 +435,8 @@ final class HomeMode {
 
     /** Adds ours to the enabled accessibility services (keeping the others, like TalkBack), or takes it out. */
     private static void remoteService(Context c, Adb adb, boolean on) throws IOException {
+        // From then on the home screen puts the service back itself when Android drops it (ServiceRepair), no ADB.
+        if (on) adb.shell("pm grant " + PKG + " android.permission.WRITE_SECURE_SETTINGS");
         String current = adb.shell("settings get secure enabled_accessibility_services").trim();
         if (current.equals("null")) current = "";
         List<String> others = new ArrayList<>();
@@ -631,6 +634,7 @@ final class HomeMode {
                 }
             }
             record(adb, disabled);
+            usageAccess(adb, true);
             s = state(c);
             s.put("mode", FREE).put("since", System.currentTimeMillis()).put("homeReverted", false)
                     .put("disabled", new JSONArray(sorted(disabled))).put("setupHome", setupHome);
@@ -662,6 +666,7 @@ final class HomeMode {
         JSONObject s = state(c);
         try (Adb adb = connect(c, s)) {
             busy(c, Ui.tr("Turning the apps back on…"));
+            usageAccess(adb, false);
             String home = originalHome(s);
             Set<String> toEnable = new HashSet<>(stringList(s, "disabled"));
             for (String pkg : targets(home, originalDream(s), true)) {
@@ -1442,6 +1447,18 @@ final class HomeMode {
      * and a new install must still tell its own work from what the person had turned off (#142).
      */
     private static final String RECORD = "free_my_tv_disabled";
+
+    /**
+     * Apps' Most used row reads how long each app was used (UsageStatsManager, on the TV only): allowed with the switch,
+     * back to the TV's default with Original.
+     */
+    private static void usageAccess(Adb adb, boolean on) {
+        try {
+            adb.shell("appops set " + PKG + " GET_USAGE_STATS " + (on ? "allow" : "default"));
+        } catch (IOException e) {
+            AppLog.w("usage access: " + e.getMessage());
+        }
+    }
 
     private static Set<String> recorded(Adb adb) {
         Set<String> out = new HashSet<>();

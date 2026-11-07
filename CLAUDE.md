@@ -266,6 +266,10 @@ entries; its system pieces are in `PROTECTED`. USB debugging opens ADB on 5555 t
 
 ## The code
 
+**The home screen is Ibtzy TV Launcher's design (2026-11-06 port): read `IBTZY_UI_PORT.md` first.** It says which
+classes came from Ibtzy, what was grafted where, which Free My TV features wait for a design, and the TV scripts
+(`tools/perf_suite.sh` and friends) for measuring. Some notes below describe the previous home screen's drawing.
+
 - Java 8 language level, minSdk 26 (Android 8), targetSdk 33. No Gradle, no libraries: only the Android SDK.
   Android 9 and older have no RenderNode (`Recording` wraps it, with a Picture there) and no `cmd role`. On Android 8 to 11,
   and on Android 12 and 12L under 3 GB of RAM (`Ui.LEGACY`), the home screen skips the GPU layers, draws blurred

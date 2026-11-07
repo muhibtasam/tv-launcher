@@ -66,7 +66,7 @@ final class Ui {
     static volatile String language = "en";
     /** Bumped when the language changes: text cached by the screens is made again. */
     static volatile int generation;
-    static Typeface thin, light, displayMedium, displaySemibold, regular, medium, semibold;
+    static Typeface thin, light, displayMedium, displaySemibold, displayItalic, regular, medium, semibold;
     private static boolean loaded;
     private static final Rect BOUNDS = new Rect();
     private static final RectF OVAL = new RectF();
@@ -75,21 +75,28 @@ final class Ui {
         if (loaded) return;
         loaded = true;
         AssetManager a = c.getAssets();
-        thin = font(a, 32, 200);
-        light = font(a, 32, 300);
-        displayMedium = font(a, 32, 500);
-        displaySemibold = font(a, 32, 600);
-        regular = font(a, 14, 400);
-        medium = font(a, 14, 500);
-        semibold = font(a, 14, 600);
+        // Headlines (titles, clocks, big numbers): Fraunces. Body text: Sora. Inter if either file is missing.
+        thin = font(a, HEADLINE, 32, 300);
+        light = font(a, HEADLINE, 32, 300);
+        displayMedium = font(a, HEADLINE, 32, 500);
+        displaySemibold = font(a, HEADLINE, 32, 600);
+        displayItalic = font(a, HEADLINE_ITALIC, 32, 600);   // the Games rails' titles (Inter if missing)
+        regular = font(a, BODY, 14, 400);
+        medium = font(a, BODY, 14, 500);
+        semibold = font(a, BODY, 14, 600);
     }
 
-    /** Inter at an optical size (14 = text, 32 = display) and weight; the system font if the file is missing. */
-    private static Typeface font(AssetManager a, int opticalSize, int weight) {
-        if (has(a, FONT)) {
+    /**
+     * A variable font at an optical size (14 = text, 32 = display; fonts without that axis ignore it) and weight; then
+     * Inter; then the system font.
+     */
+    private static Typeface font(AssetManager a, String file, int opticalSize, int weight) {
+        for (String f : new String[] {file, FONT}) {
+            if (!has(a, f)) continue;
             try {
-                Typeface t = new Typeface.Builder(a, FONT)
-                        .setFontVariationSettings("'opsz' " + opticalSize + ", 'wght' " + weight).build();
+                Typeface t = new Typeface.Builder(a, f)
+                        // WONK 0: Fraunces' plain letterforms (its default leans some letters); others ignore it.
+                        .setFontVariationSettings("'opsz' " + opticalSize + ", 'wght' " + weight + ", 'WONK' 0").build();
                 if (t != null) return t;
             } catch (RuntimeException ignored) {
             }
@@ -107,6 +114,8 @@ final class Ui {
     }
 
     private static final String FONT = "fonts/InterVariable.ttf";
+    // Headlines: Fraunces (serif). Body: Sora (Ibtzy's fonts, OFL; their notices are beside them).
+    private static final String HEADLINE = "fonts/Fraunces.ttf", HEADLINE_ITALIC = "fonts/Fraunces-Italic.ttf", BODY = "fonts/Sora.ttf";
 
     // MARK: - Text in the viewer's language
 
@@ -238,6 +247,7 @@ final class Ui {
 
     /** The same for a setting ("auto", "fr"…) given by the caller (SleepOverlay gets it in its Intent). */
     static synchronized void applyLanguage(String setting) {
+        Tr.source = SOURCE;
         String lang = resolve(setting);
         Map<String, String> cat = Collections.emptyMap();
         if (!lang.equals("en")) {
@@ -550,4 +560,32 @@ final class Ui {
         OVAL.set(cx - r, cy - r, cx + r, cy + r);
         c.drawArc(OVAL, (seconds * 360f) % 360f, 270f, false, stroke);
     }
+
+    private static String trOf(String english) {
+        return tr(english);
+    }
+
+    private static String pluralOf(String key, long n) {
+        return plural(key, n);
+    }
+
+    /** The logic classes' text (Tr) from this catalogue. */
+    private static final Tr.Source SOURCE = new Tr.Source() {
+        @Override public String tr(String english) {
+            return trOf(english);
+        }
+
+        @Override public String plural(String key, long n) {
+            return pluralOf(key, n);
+        }
+
+        @Override public String date(String key, long ms, java.util.TimeZone zone) {
+            DatePattern p = datePattern(key);
+            return Tr.format(p.text, p.locale, ms, zone);
+        }
+
+        @Override public Locale locale() {
+            return Ui.locale();
+        }
+    };
 }

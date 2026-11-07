@@ -134,7 +134,9 @@ final class Shaders {
      * Liquid Glass (macOS 27 style) for the shelf and the cards: the background shows through the glass, lightly
      * blurred (`imageA`: the photo at 480×270, or the frosted aurora), with a slight color boost; near the edge the
      * glass is "thick" and bends the image outward (a lens), with slight color dispersion; the rim has a thin
-     * highlight, strong where it faces the light (top left), and an echo on the opposite side, plus a soft inner halo.
+     * highlight, strong where it faces the light (top left), fading along the sides, a faint echo on the opposite side
+     * and a soft inner halo; the thick rim is a little brighter (Fresnel); bright backgrounds are compressed under the
+     * glass (a soft knee) so the material and the text on it look the same over a light poster and a dark sky.
      * `imageB`/`mixB`: the next photo during a transition, blended here (no texture rebuild every frame). band = width
      * of the thick rim (px), refraction = how much it bends (px), specular = highlight strength. Premultiplied color.
      */
@@ -183,6 +185,11 @@ final class Shaders {
         "  }\n" +
         "  half l = dot(bg, half3(0.2126, 0.7152, 0.0722));\n" +
         "  bg = mix(half3(l), bg, 1.18) * 1.06;\n" +
+        // Surface response: the same material over a bright poster as over a dark sky. Light under the glass is
+        // compressed above 0.58 (a soft knee) and the darks lifted a touch, so text on the glass reads alike everywhere.
+        "  half bl = dot(bg, half3(0.2126, 0.7152, 0.0722));\n" +
+        "  if (bl > 0.58) { bg *= (0.58 + (bl - 0.58) * 0.45) / bl; }\n" +
+        "  bg += half3(0.02 * (1.0 - clamp(bl, 0.0, 1.0)));\n" +
         "  half3 col = mix(bg, tint.rgb, tint.a) + half3(lift);\n" +
         "  float ny = d.y / halfSize.y;\n" +
         "  col *= half(1.0 - 0.12 * smoothstep(0.1, 1.0, ny));\n" +
@@ -190,10 +197,16 @@ final class Shaders {
         "  float2 L = float2(-0.4, -0.917);\n" +
         "  float facing = clamp(dot(n, L), 0.0, 1.0);\n" +
         "  float back = clamp(-dot(n, L), 0.0, 1.0);\n" +
-        "  float rim = 1.0 - smoothstep(0.0, 2.4, inner);\n" +
-        "  float halo = 1.0 - smoothstep(0.0, 11.0, inner);\n" +
-        "  float spec = rim * (0.22 + 0.78 * facing + 0.4 * back) + halo * (0.12 * facing + 0.05 * back);\n" +
-        "  col += half3(spec * specular);\n" +
+        // Fresnel: the thick rim (where the glass bends the image) reflects a little more light.
+        "  col += half3(0.05 * bend);\n" +
+        // The edge catches the light where it faces it (top left), fades along the sides and echoes faintly on the
+        // far side: a light-catching edge, not an even white outline. The highlight takes a little of the color under
+        // the glass (it reflects its surroundings) rather than pure white.
+        "  float rim = 1.0 - smoothstep(0.0, 1.8, inner);\n" +
+        "  float halo = 1.0 - smoothstep(0.0, 9.0, inner);\n" +
+        "  float spec = rim * (0.07 + 0.93 * facing * facing + 0.18 * back * back) + halo * (0.10 * facing + 0.03 * back);\n" +
+        "  half3 specCol = mix(half3(1.0), clamp(bg * 1.5 + half3(0.25), 0.0, 1.0), 0.3);\n" +
+        "  col += specCol * half(spec * specular);\n" +
         "  col += half3((hash(xy) - 0.5) * 0.0039);\n" +
         "  return half4(col * half(aa), half(aa));\n" +
         "}\n";
@@ -342,6 +355,13 @@ final class Shaders {
         out.set(NIGHT[0], NIGHT[1], NIGHT[2]);
     }
 
+    private static int mix(int a, int b, float f) {
+        int r = Math.round(((a >> 16) & 255) * (1 - f) + ((b >> 16) & 255) * f);
+        int g = Math.round(((a >> 8) & 255) * (1 - f) + ((b >> 8) & 255) * f);
+        int bl = Math.round((a & 255) * (1 - f) + (b & 255) * f);
+        return (r << 16) | (g << 8) | bl;
+    }
+
     /**
      * Settings: dark and nearly neutral at any hour, like the home screen's plain background at night (the day's sky
      * read as a flat bright blue there, above all without AGSL, where it's a plain gradient); a trace of violet moves in
@@ -349,12 +369,5 @@ final class Shaders {
      */
     static void settings(Palette out) {
         out.set(0x08090C, 0x141519, 0x2B2838);
-    }
-
-    private static int mix(int a, int b, float f) {
-        int r = Math.round(((a >> 16) & 255) * (1 - f) + ((b >> 16) & 255) * f);
-        int g = Math.round(((a >> 8) & 255) * (1 - f) + ((b >> 8) & 255) * f);
-        int bl = Math.round((a & 255) * (1 - f) + (b & 255) * f);
-        return (r << 16) | (g << 8) | bl;
     }
 }

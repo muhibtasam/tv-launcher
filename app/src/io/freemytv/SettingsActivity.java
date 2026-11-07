@@ -150,12 +150,15 @@ public class SettingsActivity extends Activity {
 
     static final class SettingsView extends View implements Choreographer.FrameCallback {
         private static final int MAIN = 0, HOME_CHOICE = 1, HOME_SETTINGS = 2, REMOTE_KEYS = 3, PICKER = 4, SHELF_EDIT = 5,
-                POWER = 6, TMDB_KEY = 7, PICKS = 8, PICK_FROM = 9, WATCH_APPS = 10;
+                POWER = 6, TMDB_KEY = 7, PICKS = 8, PICK_FROM = 9, WATCH_APPS = 10,
+                TABS = 11;
         private static final float LIST_ROW_H = 68, LIST_ROW_GAP = 6;
         private static final int PICK_VISIBLE = 9;
         private static final float LIST_X = 1000, LIST_R = 1824, LIST_TOP = 186, ROW_GAP = 8, CHOICE_H = 104;
         // The main menu: eight rows, then the comparison, the picks (with the Watchmode credit) and two notices, all on
         // one 1080 px screen: the rows share the 462 px that seven took.
+        // Free My TV's row height: 9 rows plus the comparison, picks and notices must fit (the Ibtzy design's 72 px rows
+        // pushed the notices off the screen on the TV).
         private static final float MAIN_TOP = 140, ROW_H = 53.75f, MAIN_GAP = 4;
         private static final int AMBER = 0xFFFFC266, INK = 0xFF1C1C1E;
 
@@ -224,7 +227,7 @@ public class SettingsActivity extends Activity {
         private final boolean phone;   // installed on a phone: the settings say where it goes (HomeMode.phone)
         private int w, h;
         private float k = 1;
-        private Paint title, subtitle, version, rowLabel, rowValue, rowSub, header, cellLabel, cellValue, warn, spinner, white, shadow;
+        private Paint titleIt, ivoryRing, bgFill, glow, title, subtitle, version, rowLabel, rowValue, rowSub, header, cellLabel, cellValue, warn, spinner, white, shadow;
         private TextPaint notice, rowValueFit;
 
         private final Runnable poll = new Runnable() {
@@ -326,7 +329,7 @@ public class SettingsActivity extends Activity {
                                 : freeActive() ? "Free My TV" : Ui.tr("Original");
                         return Ui.trf("Home Screen, {mode}", "mode", value);
                     }
-                    String[] names = {Ui.tr("Screensaver, preview"), Ui.tr("Home Settings"),
+                    String[] names = {Ui.tr("Screensaver, preview"), Ui.tr("Home Settings"), Ui.tr("Tabs"),
                             Ui.tr("Shelf"), Ui.tr("Top Buttons"), Ui.tr("Remote Buttons"), Ui.tr("Sleep Timer"),
                             Ui.tr("TV Settings")};
                     return row - 1 < names.length ? names[row - 1] : "";
@@ -382,6 +385,8 @@ public class SettingsActivity extends Activity {
                     if (row >= keyRowIds.length) return "";
                     // TalkBack can't see the drawn text: the first row also says what the key is for and how to get one.
                     return row == 0 && keyHelp != null ? keyLabel(keyRowIds[0]) + ". " + keyHelp : keyLabel(keyRowIds[row]);
+                case TABS:
+                    return row < 3 ? tabLabels()[row] + ", " + tabValues()[row] : "";
                 default:
                     return "";
             }
@@ -448,12 +453,20 @@ public class SettingsActivity extends Activity {
             Symbols.warm(getContext(), "sparkles", 150 * k);
             Symbols.warm(getContext(), "chevron_right", 22 * k);
             Symbols.warm(getContext(), "check", 26 * k);
-            title = Ui.text(Ui.displaySemibold, 50 * k, 0xFFFFFFFF);
-            title.setTextAlign(Paint.Align.CENTER);
-            subtitle = Ui.text(Ui.regular, 26 * k, 0x99FFFFFF);
-            subtitle.setTextAlign(Paint.Align.CENTER);
-            version = Ui.text(Ui.regular, 22 * k, 0x66FFFFFF);
-            version.setTextAlign(Paint.Align.CENTER);
+            // As the home screen's headings: serif name, its second half italic, in ivory (the Ibtzy design).
+            title = Ui.text(Ui.displaySemibold, 72 * k, 0xFFF3EDE2);
+            titleIt = Ui.text(Ui.displayItalic, 72 * k, 0xFFF3EDE2);
+            subtitle = Ui.text(Ui.regular, 24 * k, 0xBFF3EDE2);
+            version = Ui.text(Ui.regular, 20 * k, 0x80F3EDE2);
+            ivoryRing = new Paint(Paint.ANTI_ALIAS_FLAG);
+            ivoryRing.setStyle(Paint.Style.STROKE);
+            ivoryRing.setStrokeWidth(3 * k);
+            ivoryRing.setColor(0xFFFFFFE0);
+            // The launcher's own ground: warm black, a soft ember glow behind the name (drawn once per frame, no motion).
+            bgFill = new Paint();
+            bgFill.setShader(new android.graphics.LinearGradient(0, 0, 0, h, 0xFF1C1517, 0xFF0E0B0D, android.graphics.Shader.TileMode.CLAMP));
+            glow = new Paint();
+            glow.setShader(new android.graphics.RadialGradient(0.22f * w, 0.5f * h, 800 * k, 0x29FF6A3D, 0x00FF6A3D, android.graphics.Shader.TileMode.CLAMP));
             rowLabel = Ui.text(Ui.medium, 30 * k, 0xF2FFFFFF);
             rowValue = Ui.text(Ui.regular, 28 * k, 0x8CFFFFFF);
             rowValue.setTextAlign(Paint.Align.RIGHT);
@@ -529,7 +542,8 @@ public class SettingsActivity extends Activity {
 
         private int rowCount() {
             switch (screen) {
-                case MAIN: return 8;
+                case MAIN: return 9;
+                case TABS: return 3;
                 case HOME_CHOICE: return 2;
                 case HOME_SETTINGS: return Math.min(SETTINGS_VISIBLE, settingLabels().length);
                 case PICKER: return Math.min(PICK_VISIBLE, pickLabels.size());
@@ -560,19 +574,18 @@ public class SettingsActivity extends Activity {
             }
             long up = SystemClock.uptimeMillis();
             float seconds = (up - startedAt) / 1000f;   // the spinner's
-            skySeconds += dt;
-            if (up - lastSky >= 100) {
-                lastSky = up;
-                scene.advance(skySeconds);
-            }
-            scene.drawBackground(c);
+            c.drawRect(0, 0, w, h, bgFill);
+            c.drawRect(0, 0, w, h, glow);
 
-            // On the left: big symbol, title, description.
-            float cx = 500 * k;
-            Symbols.draw(getContext(), c, "sparkles", cx, 400 * k, 150 * k, 0xEBFFFFFF);
-            c.drawText("Free My TV", cx, 612 * k, title);
-            c.drawText(Ui.tr("Your TV's home screen and screensaver"), cx, 660 * k, subtitle);
-            c.drawText(versionName(getContext()), cx, 704 * k, version);
+            // On the left, as the launcher's headings: a short ivory bar, the name (serif, its second half italic).
+            float lx = 140 * k;
+            white.setAlpha(255);
+            tmp.set(lx, 380 * k, lx + 48 * k, 384 * k);
+            c.drawRoundRect(tmp, 2 * k, 2 * k, white);
+            c.drawText("Free My", lx, 470 * k, title);
+            c.drawText("TV", lx + title.measureText("Free My "), 470 * k, titleIt);
+            c.drawText(Ui.tr("Your TV's home screen and screensaver"), lx, 524 * k, subtitle);
+            c.drawText(versionName(getContext()).replace("Free My TV ", "Version "), lx, 562 * k, version);
 
             if (screen == MAIN) drawMain(c, seconds); else if (screen == HOME_CHOICE) drawChoice(c); else if (screen == PICKER) drawPicker(c); else if (screen == SHELF_EDIT) drawShelfEditor(c);
             else if (screen == TMDB_KEY) drawKey(c);
@@ -586,9 +599,9 @@ public class SettingsActivity extends Activity {
             String busyText = busyText();
             String mode = freeActive() ? "Free My TV" : Ui.tr("Original");
             String[] labels = {Ui.tr("Home Screen"), Ui.tr("Screensaver"),
-                    Ui.tr("Home Settings"), Ui.tr("Shelf"), Ui.tr("Top Buttons"),
+                    Ui.tr("Home Settings"), Ui.tr("Tabs"), Ui.tr("Shelf"), Ui.tr("Top Buttons"),
                     Ui.tr("Remote Buttons"), Ui.tr("Sleep Timer"), Ui.tr("TV Settings")};
-            String[] values = {working ? "" : mode, Ui.tr("Preview"), "", "", "", "", "", ""};
+            String[] values = {working ? "" : mode, Ui.tr("Preview"), "", "", "", "", "", "", ""};
             for (int i = 0; i < labels.length; i++) {
                 float y = (MAIN_TOP + i * (ROW_H + MAIN_GAP)) * k;
                 rowRect.set(LIST_X * k, y, LIST_R * k, y + ROW_H * k);
@@ -665,26 +678,26 @@ public class SettingsActivity extends Activity {
             if (!Recs.watchmodeKey().isEmpty()) {
                 c.drawText(Ui.tr("Links to the titles by Watchmode."), x, y + 108 * k, version);
             }
-            version.setTextAlign(Paint.Align.CENTER);
             return y + (Recs.watchmodeKey().isEmpty() ? 78 : 108) * k;
         }
 
         /** List row: no background; focused, white with a shadow (the Apple TV focus). Returns how focused it is. */
         private float drawRowBackground(Canvas c, int i) {
-            float f = Ui.clamp(pop[i].value);
+            float f = Ui.clamp(pop[i].value), r = 24 * k;
+            // Every row a quiet glass pill; the focused one ivory with the launcher's ivory ring (as its tabs).
+            white.setColor(0xFFF3EDE2);
+            white.setAlpha(Math.round(13 * (1 - f)));
+            c.drawRoundRect(rowRect, r, r, white);
             if (f > 0.01f) {
-                float s = 1 + 0.02f * f;
-                float cx = rowRect.centerX(), cy = rowRect.centerY();
-                tmp.set(cx - rowRect.width() * s / 2, cy - rowRect.height() * s / 2, cx + rowRect.width() * s / 2, cy + rowRect.height() * s / 2);
-                float r = 18 * k * s;
-                tmp.offset(0, 10 * k * f);
-                shadow.setColor(Ui.alpha(0xFF000000, 0.4f * f));
-                c.drawRoundRect(tmp, r, r, shadow);
-                tmp.offset(0, -10 * k * f);
+                white.setColor(blend(0xFFEADFCB, 0xFFFFF8EC, 0.5f));
                 white.setAlpha(Math.round(255 * f));
-                c.drawRoundRect(tmp, r, r, white);
-                rowRect.set(tmp);
+                c.drawRoundRect(rowRect, r, r, white);
+                ivoryRing.setAlpha(Math.round(255 * f));
+                tmp.set(rowRect);
+                tmp.inset(-5.5f * k, -5.5f * k);
+                c.drawRoundRect(tmp, r + 5.5f * k, r + 5.5f * k, ivoryRing);
             }
+            white.setColor(0xFFF5F5F7);
             return f;
         }
 
@@ -895,7 +908,7 @@ public class SettingsActivity extends Activity {
                 case KeyEvent.KEYCODE_DPAD_RIGHT:
                     if (down && screen == SHELF_EDIT) {
                         moveShelfApp(e.getKeyCode() == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
-                    } else if (down && (screen == HOME_SETTINGS || screen == REMOTE_KEYS || screen == POWER || screen == PICKS || screen == PICK_FROM)) {
+                    } else if (down && (screen == HOME_SETTINGS || screen == REMOTE_KEYS || screen == TABS || screen == POWER || screen == PICKS || screen == PICK_FROM)) {
                         adjust(e.getKeyCode() == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
                     }
                     whyRows = null;   // a value or the rows' order changed: what each row needs may have too
@@ -950,8 +963,8 @@ public class SettingsActivity extends Activity {
                                 pickScroll = 0;
                                 screen = HOME_SETTINGS;
                             } else {
-                                focus = screen == HOME_SETTINGS ? 2 : screen == SHELF_EDIT ? (editingTop ? 4 : 3)
-                                        : screen == REMOTE_KEYS ? 5 : screen == POWER ? 6 : 0;
+                                focus = screen == HOME_SETTINGS ? 2 : screen == TABS ? 3 : screen == SHELF_EDIT ? (editingTop ? 5 : 4)
+                                        : screen == REMOTE_KEYS ? 6 : screen == POWER ? 7 : 0;
                                 screen = MAIN;
                             }
                         }
@@ -995,7 +1008,7 @@ public class SettingsActivity extends Activity {
             l.add(Ui.tr("Clock"));
             l.add(Ui.tr("My Photos"));
             l.add(Ui.tr("Navigation sounds"));
-            l.add(Ui.tr("Top of the screen"));
+            l.add(Ui.tr("Continue Watching"));   // Free My TV's "Top of the screen": on the Ibtzy home screen, the row under the picks
             l.add(Ui.tr("Picks"));
             l.add(Ui.tr("Continue Watching apps"));
             l.add(Ui.tr("Watch from the screensaver"));
@@ -1035,6 +1048,22 @@ public class SettingsActivity extends Activity {
         /** A key's row: "Not set", or the key's last 4 characters (all that's ever shown of it). */
         private static String keyValue(String key) {
             return key.length() < 4 ? Ui.tr("Not set") : "•••• " + key.substring(key.length() - 4);
+        }
+
+        // MARK: - Tabs (from the Ibtzy design: For You's Movies & Shows and Games, and Apps, each on or off)
+
+        private String[] tabLabels() {
+            return new String[] {Ui.tr("Movies & Shows"), Ui.tr("Games"), Ui.tr("Apps")};
+        }
+
+        private String[] tabValues() {
+            return new String[] {onOff(Prefs.tabMovies()), onOff(Prefs.tabGames()), onOff(Prefs.tabApps())};
+        }
+
+        private void toggleTab(int i) {
+            if (i == 0) Prefs.setTabMovies(!Prefs.tabMovies());
+            else if (i == 1) Prefs.setTabGames(!Prefs.tabGames());
+            else Prefs.setTabApps(!Prefs.tabApps());
         }
 
         private String[] picksLabels() {
@@ -1102,9 +1131,8 @@ public class SettingsActivity extends Activity {
             v[PICKS_ROW] = "›";   // opens its own screen: Picks per tab and Picks from
             v[SAVER_ROW] = onOff(Prefs.saverWatch());
             String top = Prefs.topContent();
-            v[TOP_ROW] = top.equals(Prefs.TOP_CONTINUE) ? Ui.tr("Continue Watching")
-                    : top.equals(Prefs.TOP_NONE) ? Ui.tr("Clock")
-                    : Ui.tr("Picks");
+            // The Ibtzy home screen always has its picks: this row is the Continue Watching row under them, on or off.
+            v[TOP_ROW] = onOff(top.equals(Prefs.TOP_CONTINUE));
             v[WATCH_ROW] = watchCount();
             String rec = Prefs.recents();
             v[RECENTS_ROW] = rec.equals("home") ? Ui.tr("recents|Drawer and Home twice") : rec.equals("drawer") ? Ui.tr("recents|In the drawer") : Ui.tr("Off");
@@ -1142,8 +1170,8 @@ public class SettingsActivity extends Activity {
         private String need(int i) {
             switch (screen) {
                 case MAIN:
-                    return i == 0 ? Capabilities.NEED_SWITCH : i == 5 ? Capabilities.NEED_REMOTE_BUTTONS
-                            : i == 6 ? Capabilities.NEED_ADB : null;
+                    return i == 0 ? Capabilities.NEED_SWITCH : i == 6 ? Capabilities.NEED_REMOTE_BUTTONS
+                            : i == 7 ? Capabilities.NEED_ADB : null;
                 case HOME_SETTINGS:
                     return pickScroll + i == PLAYING_ROW ? Capabilities.NEED_LISTENER
                             : pickScroll + i == HOME_ROW ? Capabilities.NEED_HOME_ASSISTANT
@@ -1163,6 +1191,21 @@ public class SettingsActivity extends Activity {
             }
         }
 
+        /**
+         * Home Settings rows whose part of the screen the Ibtzy-design home screen doesn't draw yet (their settings are
+         * kept; each comes back when its design is approved and built). By English label: the rows move by TV.
+         */
+        private boolean notHere(int r) {
+            String[] labels = screen == HOME_SETTINGS ? settingLabels() : screen == PICKS ? picksLabels() : null;
+            int at = screen == HOME_SETTINGS ? pickScroll + r : r;
+            if (labels == null || at < 0 || at >= labels.length) return false;
+            String[] notHere = {Ui.tr("Status icons"),
+                    Ui.tr("Recent Apps"), Ui.tr("Forecast"), Ui.tr("Now Playing widget"), "Home Assistant", Ui.tr("Dollar"),
+                    Ui.tr("Picks per tab")};
+            for (String label : notHere) if (labels[at].equals(label)) return true;
+            return false;
+        }
+
         /** Why row `i` can't be used here, for the person to read; null where it works. */
         private String unavailable(int i) {
             int n = rowCount();
@@ -1173,7 +1216,8 @@ public class SettingsActivity extends Activity {
                 whyScroll = pickScroll;
                 for (int r = 0; r < n; r++) {
                     String need = need(r);
-                    whyRows[r] = screen == HOME_SETTINGS && pickScroll + r >= COIN_ROWS && pickScroll + r < keyRow() && !Prefs.quotes()
+                    whyRows[r] = notHere(r) ? Ui.tr("Not on the new home screen yet: this setting comes back with its design.")
+                            : screen == HOME_SETTINGS && pickScroll + r >= COIN_ROWS && pickScroll + r < keyRow() && !Prefs.quotes()
                             ? Ui.tr("Turn on the Quotes widget to pick its coins.")
                             : need == null ? null : Capabilities.missing(getContext(), need);
                 }
@@ -1284,11 +1328,11 @@ public class SettingsActivity extends Activity {
         }
 
         private String[] listLabels() {
-            return screen == REMOTE_KEYS ? keyLabels() : screen == POWER ? powerLabels() : screen == PICKS ? picksLabels() : settingLabels();
+            return screen == REMOTE_KEYS ? keyLabels() : screen == TABS ? tabLabels() : screen == POWER ? powerLabels() : screen == PICKS ? picksLabels() : settingLabels();
         }
 
         private String[] listValues() {
-            return screen == REMOTE_KEYS ? keyValues() : screen == POWER ? powerValues() : screen == PICKS ? picksValues() : settingValues();
+            return screen == REMOTE_KEYS ? keyValues() : screen == TABS ? tabValues() : screen == POWER ? powerValues() : screen == PICKS ? picksValues() : settingValues();
         }
 
         private static String onOff(boolean on) {
@@ -1382,6 +1426,10 @@ public class SettingsActivity extends Activity {
             // Refused or without Free My TV mode, Now Playing can still be turned off (and the refusal is then forgotten).
             boolean turnOff = screen == HOME_SETTINGS && pickScroll + focus == PLAYING_ROW && Prefs.nowPlaying();
             if (unavailable(focus) != null && !turnOff) return;
+            if (screen == TABS) {
+                toggleTab(focus);
+                return;
+            }
             if (screen == PICKS) {
                 if (focus == 0) {
                     int n = Prefs.cards() - 3, span = Recs.MAX_CARDS - 3 + 1;
@@ -1446,9 +1494,7 @@ public class SettingsActivity extends Activity {
                 case PICKS_ROW: return;
                 case SAVER_ROW: Prefs.setSaverWatch(!Prefs.saverWatch()); break;
                 case TOP_ROW: {
-                    int at = java.util.Arrays.asList(Prefs.TOP_CONTENT).indexOf(Prefs.topContent());
-                    String next = Prefs.TOP_CONTENT[(at + dir + Prefs.TOP_CONTENT.length) % Prefs.TOP_CONTENT.length];
-                    Prefs.setTopContent(next);
+                    Prefs.setTopContent(Prefs.topContent().equals(Prefs.TOP_CONTINUE) ? Prefs.TOP_PICKS : Prefs.TOP_CONTINUE);
                     handler.removeCallbacks(askWatch);
                     watchGrantPending = false;
                     watchPickPending = true;
@@ -2177,7 +2223,7 @@ public class SettingsActivity extends Activity {
                 c.drawText(Ui.tr("This TV has little memory, so the shelf holds fewer apps."), LIST_X * k + 30 * k, hy + 38 * k, hint);
             }
             c.drawText(editingTop ? Ui.tr("OK adds or removes a button. ← → change the order.")
-                    : HomeApps.maxShelf(getContext()) == Integer.MAX_VALUE ? Ui.tr("OK adds or removes an app. ← → change the order.")
+                    : HomeApps.maxShelf(getContext()) >= HomeApps.MAX_SHELF ? Ui.tr("OK adds or removes an app. ← → change the order.")
                     : Ui.trf("OK adds or removes (up to {n}). ← → change the order.", "n", HomeApps.maxShelf(getContext())),
                     LIST_X * k + 30 * k, hy, hint);
         }
@@ -2286,7 +2332,7 @@ public class SettingsActivity extends Activity {
             String[] labels = listLabels();
             String[] values = listValues();
             Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
-            c.drawText(keys ? Ui.tr("Remote Buttons") : screen == POWER ? Ui.tr("Sleep Timer") : screen == PICKS ? Ui.tr("Picks") : Ui.tr("Home Settings"),
+            c.drawText(keys ? Ui.tr("Remote Buttons") : screen == TABS ? Ui.tr("Tabs") : screen == POWER ? Ui.tr("Sleep Timer") : screen == PICKS ? Ui.tr("Picks") : Ui.tr("Home Settings"),
                     LIST_X * k + 30 * k, (LIST_TOP - 24) * k, heading);
             float pitch = LIST_ROW_H + LIST_ROW_GAP;
             int rows = keys ? labels.length : rowCount(), from = keys ? 0 : pickScroll;
@@ -2439,6 +2485,10 @@ public class SettingsActivity extends Activity {
                 adjust(1);
                 invalidate();
                 return;
+            } else if (screen == TABS) {
+                adjust(1);
+                invalidate();
+                return;
             } else if (screen == HOME_SETTINGS) {
                 adjust(1);
                 invalidate();
@@ -2457,22 +2507,26 @@ public class SettingsActivity extends Activity {
                 watchApps = null;
                 scanWatchApps();
             } else if (focus == 3) {
-                openShelfEditor(false);
+                screen = TABS;
+                focus = 0;
+                pickScroll = 0;   // Home Settings' scroll would point past these 3 rows
             } else if (focus == 4) {
-                openShelfEditor(true);
+                openShelfEditor(false);
             } else if (focus == 5) {
+                openShelfEditor(true);
+            } else if (focus == 6) {
                 HomeMode.ensureRemoteService(c, 0);   // the buttons work from inside other apps through this service
                 loadApps();
                 screen = REMOTE_KEYS;
                 focus = 0;
-            } else if (focus == 6) {
+            } else if (focus == 7) {
                 pickScroll = 0;
                 screen = POWER;
                 focus = 0;
             } else {
                 // As the drawer's TV Settings: where nothing answers the standard request (an HY300 Pro+ in Free My TV
                 // mode, #379), Android TV's own settings, and never a crash.
-                HomeApps.open(activity, HomeApps.tvSettings(), null);
+                HomeApps.open(activity, HomeApps.tvSettings(), null, 0, 0, 1, 1);
             }
             for (Spring s : pop) s.snap(0);
             invalidate();

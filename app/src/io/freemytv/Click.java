@@ -3,9 +3,6 @@ package io.freemytv;
 import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.SoundPool;
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.os.Process;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -17,19 +14,22 @@ import java.nio.ByteOrder;
  * Soft click for the home screen (moving focus and opening). The app synthesizes the sound itself (a short, low
  * "tock"), writes it once as a WAV in the cache and plays it quietly through SoundPool. It only plays on the home
  * screen, never inside apps.
- * SoundPool.play is a call to the audio server (5 to 16 ms on a KTC TV's MediaTek, Android 11), once per key: played
- * on the UI thread it made the first frames of a focus move stutter, so it plays from a thread of its own.
  */
 final class Click {
     private static final int RATE = 48_000;
     private volatile SoundPool pool;
-    private int move, open;
-    private final HandlerThread thread = new HandlerThread("click", Process.THREAD_PRIORITY_BACKGROUND);
-    private final Handler handler;
+    private volatile int move, open;
 
+    /** Made in the background (the audio service and the sound files): not before the home screen's first frame. */
     Click(Context c) {
-        thread.start();
-        handler = new Handler(thread.getLooper());
+        final Context app = c.getApplicationContext();
+        Thread t = new Thread(() -> load(app), "click-sounds");
+        t.setPriority(Thread.MIN_PRIORITY);
+        t.start();
+    }
+
+    private synchronized void load(Context c) {
+        if (released) return;
         try {
             pool = new SoundPool.Builder().setMaxStreams(3).setAudioAttributes(new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
@@ -43,26 +43,19 @@ final class Click {
     }
 
     void move() {
-        if (pool == null || !Prefs.sounds()) return;
-        handler.post(() -> {
-            SoundPool p = pool;
-            if (p != null) p.play(move, 0.14f, 0.14f, 1, 0, 1f);
-        });
+        if (pool != null && Prefs.sounds()) pool.play(move, 0.14f, 0.14f, 1, 0, 1f);
     }
 
     void open() {
-        if (pool == null || !Prefs.sounds()) return;
-        handler.post(() -> {
-            SoundPool p = pool;
-            if (p != null) p.play(open, 0.18f, 0.18f, 1, 0, 1f);
-        });
+        if (pool != null && Prefs.sounds()) pool.play(open, 0.18f, 0.18f, 1, 0, 1f);
     }
 
-    void release() {
-        SoundPool p = pool;
+    private volatile boolean released;
+
+    synchronized void release() {
+        released = true;
+        if (pool != null) pool.release();
         pool = null;
-        if (p != null) handler.post(p::release);   // after the plays already queued, never during one
-        thread.quitSafely();
     }
 
     /** Sine wave plus one harmonic, 1.5 ms attack (no pop) and exponential decay. */

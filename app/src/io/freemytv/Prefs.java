@@ -301,7 +301,12 @@ final class Prefs {
 
     /** Single items hidden from Continue Watching (holding OK on a card), as WatchNext.hideKey. */
     static Set<String> watchHidden() { return new HashSet<>(sp().getStringSet("watchHidden", new HashSet<>())); }
-    static void setWatchHidden(Set<String> keys) { putQuietly("watchHidden", keys); }
+    /** Saved to disk before it returns (call off the main thread); false if the write failed. */
+    static boolean setWatchHidden(java.util.Set<String> keys) {
+        boolean ok = sp().edit().putStringSet("watchHidden", new java.util.HashSet<>(keys)).commit();
+        if (ok) version++;
+        return ok;
+    }
 
     /** Recent Apps: "off" (the default: Android manages memory on its own), "drawer" (a shortcut in the bottom drawer and the
      *  remote's app-switch key) or "home" (those, and pressing Home twice). The top button is its own choice (Top Buttons). */
@@ -592,4 +597,27 @@ final class Prefs {
         for (int key : KEYS) sb.append(key).append('=').append(key == keyCode ? pkg : keyApp(key)).append('\n');
         if (writeKeys(sb.toString())) version++;
     }
+
+    /** A removed Continue title comes back (opened again from a card); in the background, like the other settings. */
+    static void unhideWatch(String key) {
+        java.util.Set<String> keys = watchHidden();
+        java.util.Set<String> left = key == null ? keys : ContinueLogic.without(keys, key);
+        if (left.size() == keys.size()) return;
+        sp().edit().putStringSet("watchHidden", left).apply();
+        version++;
+    }
+    /** Clear history: every removed title may come back. */
+    static void clearWatchHidden() {
+        sp().edit().remove("watchHidden").apply();
+        version++;
+    }
+
+    // MARK: - Tabs (Settings > Tabs)
+
+    static boolean tabMovies() { return sp().getBoolean("tabMovies", Config.TAB_MOVIES); }
+    static boolean tabGames() { return sp().getBoolean("tabGames", Config.TAB_GAMES); }
+    static boolean tabApps() { return sp().getBoolean("tabApps", Config.TAB_APPS); }
+    static void setTabMovies(boolean on) { put("tabMovies", on); }
+    static void setTabGames(boolean on) { put("tabGames", on); }
+    static void setTabApps(boolean on) { put("tabApps", on); }
 }

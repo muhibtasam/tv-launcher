@@ -5,8 +5,14 @@ final class Spring {
     float value, velocity, target;
     private final float response, damping;
 
+    /**
+     * Every spring in the app, 28% quicker than its own response says: the same curves and bounce (damping unchanged),
+     * just faster, so focus, the dock, the drawer, All Apps and the tabs all speed up together. 1 = as designed.
+     */
+    static final float SPEED = 0.72f;
+
     Spring(float response, float damping, float initial) {
-        this.response = response;
+        this.response = response * SPEED;
         this.damping = damping;
         value = target = initial;
     }
@@ -18,6 +24,12 @@ final class Spring {
 
     /** Advances `dt` seconds; returns true while still moving. */
     boolean step(float dt) {
+        // Android's "Remove animations" (animator duration scale 0): straight to the end, no motion.
+        if (!android.animation.ValueAnimator.areAnimatorsEnabled()) {
+            value = target;
+            velocity = 0;
+            return false;
+        }
         if (settled()) {
             value = target;
             velocity = 0;
