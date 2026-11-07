@@ -79,6 +79,13 @@ public class NetflixLogicTest {
         check("short pool: all of it", NetflixLogic.pick(Arrays.asList(new Title("X", 0, 1)), 4, 1).size() == 1);
         check("empty pool", NetflixLogic.pick(new ArrayList<>(), 4, 1).isEmpty() && NetflixLogic.pick(null, 4, 1).isEmpty());
 
+        // The hour's preferred titles first, still one from each list.
+        java.util.Set<Title> pref = new HashSet<>();
+        for (Title t : pool) if (t.name.equals("Movie 3") || t.name.equals("Show 4") || t.name.equals("New 2") || t.name.equals("New 5")) pref.add(t);
+        List<Title> pp = NetflixLogic.pick(pool, 4, 9, pref);
+        check("preferred first", pref.containsAll(pp) && pp.size() == 4);
+        check("preferred: one of each list", kinds(pp, 0) == 1 && kinds(pp, 1) == 1 && kinds(pp, 2) == 2);
+
         // Chip and link.
         check("top 10 chip", NetflixLogic.chip(new Title("X", NetflixLogic.SHOW, 3)).equals("TOP 10 · #3"));
         check("new chip", NetflixLogic.chip(new Title("X", NetflixLogic.NEW, 0)).equals("NEW ON NETFLIX"));

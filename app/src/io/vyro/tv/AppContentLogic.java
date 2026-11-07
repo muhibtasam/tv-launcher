@@ -77,6 +77,30 @@ public final class AppContentLogic {
         return r;
     }
 
+    // Prime Video's badge, drawn into its artwork by its image service from the address: "._PI…badge…_._ZA<words>,…_".
+    private static final java.util.regex.Pattern BADGE =
+            java.util.regex.Pattern.compile("\\._PI[^_/]*badge[^_/]*_\\._ZA([^,_/]*)[^_/]*_");
+
+    /**
+     * Prime Video's artwork comes with a badge drawn in ("NEW MOVIE", "NEW SERIES", "NEW SEASON", "TOP 10") that the
+     * grid's crop cuts in half. The same address without the badge's two parts is the clean picture (the rest, and the
+     * file type, unchanged: the image service refuses another). {clean art, the badge's words in capitals or ""}.
+     */
+    public static String[] cleanArt(String art) {
+        if (art == null) return new String[] {null, ""};
+        java.util.regex.Matcher m = BADGE.matcher(art);
+        if (!m.find()) return new String[] {art, ""};
+        String words = m.group(1);
+        try {
+            for (int i = 0; i < 3 && words.contains("%"); i++) words = java.net.URLDecoder.decode(words, "UTF-8");
+        } catch (Exception e) {
+            words = "";
+        }
+        words = words.replace('+', ' ').trim().toUpperCase(java.util.Locale.ROOT);
+        if (!words.matches("[A-Z0-9 ]{2,20}")) words = "";
+        return new String[] {art.substring(0, m.start()) + "._" + art.substring(m.end()), words};
+    }
+
     public static Record preview(Map<String, String> row, Map<Long, Channel> channels, long now) {
         Record r = base(row, now);
         Channel c = channels.get(num(row.get("channel_id")));

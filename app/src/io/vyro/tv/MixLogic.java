@@ -1,6 +1,7 @@
 package io.vyro.tv;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -61,6 +62,19 @@ public final class MixLogic {
                 for (String p : providers) if (remaining(byProvider.get(p), next.get(p), items, used)) open.add(p);
             }
             if (open.isEmpty()) break;
+            // The best titles left go first, whichever app has them (an hour's Indian or Hollywood titles before the
+            // rest; the 60% cap gives way for them); among apps with equally good ones, the cap and the weighted draw.
+            int best = Integer.MAX_VALUE;
+            Map<String, Integer> head = new HashMap<>();
+            for (String p : providers) {
+                int h = headPriority(byProvider.get(p), next.get(p), items, used);
+                head.put(p, h);
+                best = Math.min(best, h);
+            }
+            List<String> top = new ArrayList<>();
+            for (String p : open) if (head.get(p) == best) top.add(p);
+            if (top.isEmpty()) for (String p : providers) if (head.get(p) == best) top.add(p);
+            open = top;
             double total = 0;
             for (String p : open) total += weight.get(p) / (1 + taken.get(p));
             double r = rnd.nextDouble() * total;
@@ -82,6 +96,38 @@ public final class MixLogic {
             taken.put(chosen, taken.get(chosen) + 1);
         }
         return out;
+    }
+
+    private static int headPriority(List<Integer> list, int from, List<Item> items, Set<String> used) {
+        for (int i = from; i < list.size(); i++) if (!used.contains(items.get(list.get(i)).key)) return items.get(list.get(i)).priority;
+        return Integer.MAX_VALUE;
+    }
+
+    /** Home's mix for an hour: Indian titles first half the hours, Hollywood first a quarter, an even mix the rest. */
+    public static final int MIX = 0, INDIAN = 1, HOLLYWOOD = 2;
+
+    public static int mood(long hourSeed) {
+        double u = unit(hourSeed, "mood");
+        return u < 0.5 ? INDIAN : u < 0.75 ? HOLLYWOOD : MIX;
+    }
+
+    private static final Set<String> INDIAN_LANGS = new HashSet<>(java.util.Arrays.asList("hi", "ta", "te", "ml", "kn", "bn", "mr", "pa", "gu", "ur"));
+
+    /** An Indian title (TMDB's original language). */
+    public static boolean indian(String lang) {
+        return lang != null && INDIAN_LANGS.contains(lang);
+    }
+
+    /**
+     * A title's priority in the hour's mix (0 first): the hour's kind first (Indian or English-language), the app's own
+     * first few (appFirst) ahead within each; in a mixed hour Indian titles stay a step ahead. Unknown language: last.
+     */
+    public static int priority(int mood, String lang, boolean appFirst) {
+        int own = appFirst ? 0 : 1;
+        boolean in = indian(lang), en = "en".equals(lang);
+        if (mood == INDIAN) return (in ? 0 : en ? 2 : 4) + own;
+        if (mood == HOLLYWOOD) return (en ? 0 : in ? 2 : 4) + own;
+        return (in ? 0 : 1) + own;
     }
 
     private static boolean remaining(List<Integer> list, int from, List<Item> items, Set<String> used) {

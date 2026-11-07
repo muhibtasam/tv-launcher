@@ -60,6 +60,8 @@ final class Recs {
         int season;             // shows: the season airing now or last aired (0 = unknown)
         String seasonName = ""; // that season's own name, when it has one beyond "Season 3"
         String want;            // fetched for this service (Explore's per-service picks): preferred when it streams there
+        String poster = "";     // TMDB's poster path (Home's tall places), when known
+        String badge = "";      // Prime Video's own badge words ("NEW MOVIE"), drawn as Home's chip (its art is cleaned of it)
         int top10;              // Netflix's Top 10 place (1..10) on Home's Netflix tiles, 0 = none
         int label;              // What's New: ArrivalsLogic.NEW_ON / PREMIERE / NEW_SEASON / NEW_EPISODE, or NONE (no chip)
         String labelApp;        // NEW_ON: the service it was found on
@@ -367,23 +369,26 @@ final class Recs {
      */
     List<Pick> homeShown(int max) {
         List<Pick> grid = homeGrid;
-        if (MixLogic.publish(!grid.isEmpty(), homeSeed != appSeed, true, true, false)) {
+        long mix = mixSeed();
+        int mood = MixLogic.mood(System.currentTimeMillis() / 3600_000L);   // the hour's kind: the same all hour
+        if (MixLogic.publish(!grid.isEmpty(), homeSeed != mix, true, true, false)) {
             List<Pick> pool = homePool(appContent);
             List<MixLogic.Item> items = new ArrayList<>();
             Map<String, Integer> rank = new HashMap<>();
             for (Pick p : pool) {
                 int n = rank.containsKey(p.app) ? rank.get(p.app) + 1 : 1;
                 rank.put(p.app, n);
-                items.add(new MixLogic.Item(key(p), p.app, n <= 4 ? 0 : 1));   // an app's own first few first
+                items.add(new MixLogic.Item(key(p), p.app, MixLogic.priority(mood, langOf(p), n <= 4)));   // the hour's kind, then an app's own first few
             }
             List<Pick> made = new ArrayList<>();
-            for (int i : MixLogic.pick(items, HOME_GRID, appSeed)) made.add(pool.get(i));
+            for (int i : MixLogic.pick(items, HOME_GRID, mix)) made.add(pool.get(i));
             if (!made.isEmpty()) {
                 homeGrid = grid = made;
-                homeSeed = appSeed;
+                homeSeed = mix;
                 Map<String, Integer> per = new LinkedHashMap<>();
                 for (Pick p : made) per.merge(String.valueOf(p.app), 1, Integer::sum);
-                AppLog.w("home grid: " + made.size() + " from " + pool.size() + " app titles " + per);
+                AppLog.w("home grid: " + made.size() + " from " + pool.size() + " app titles " + per + ", mood "
+                        + (mood == MixLogic.INDIAN ? "Indian" : mood == MixLogic.HOLLYWOOD ? "Hollywood" : "mix"));
                 io.execute(this::save);
             }
         }
@@ -391,9 +396,12 @@ final class Recs {
         Map<String, Boolean> have = new HashMap<>();
         for (Pick p : grid) {
             if (out.size() >= max) break;
-            if (p.pkg != null && have.computeIfAbsent(p.pkg, this::installed)) out.add(p);
+            if (p.pkg != null && have.computeIfAbsent(p.pkg, this::installed)) {
+                if ("app".equals(p.kind) && p.poster.isEmpty()) p.poster = cache.getString("poster:" + AppContentLogic.normTitle(langName(p.title)), "");
+                out.add(p);
+            }
         }
-        List<Pick> netflix = netflixShown();   // 4 Netflix tiles spread through the grid (NETFLIX_SLOTS)
+        List<Pick> netflix = netflixShown(mix, mood);   // 4 Netflix tiles spread through the grid (NETFLIX_SLOTS)
         for (int i = 0; i < netflix.size() && i < NETFLIX_SLOTS.length; i++) {
             Pick p = netflix.get(i);
             if (p != null && have.computeIfAbsent(p.pkg, this::installed)) out.add(Math.min(NETFLIX_SLOTS[i], out.size()), p);
@@ -409,7 +417,7 @@ final class Recs {
 
     static final String NETFLIX_TOP10 = "https://muhibtasam.github.io/vyro/netflix-top10.tsv";
     private static final long NETFLIX_EVERY = 12 * 3600_000L, NETFLIX_RETRY = 30 * 60_000L;
-    private static final int[] NETFLIX_SLOTS = {0, 3, 6, 9};
+    private static final int[] NETFLIX_SLOTS = {1, 3, 5, 7};
     private static final int NETFLIX_PROVIDER = 8;   // TMDB's id for Netflix
     private final ExecutorService netflixIo = lowPriority(1);
     private final java.util.concurrent.atomic.AtomicBoolean netflixRunning = new java.util.concurrent.atomic.AtomicBoolean();
@@ -432,7 +440,7 @@ final class Recs {
                     if (!netflixPool.isEmpty()) post(done);
                 }
                 long now = System.currentTimeMillis();
-                if (now - cache.getLong("nf:at2", 0) < NETFLIX_EVERY && !netflixPool.isEmpty()) return;
+                if (now - cache.getLong("nf:at5", 0) < NETFLIX_EVERY && !netflixPool.isEmpty()) return;
                 if (now - netflixTriedAt < NETFLIX_RETRY) return;
                 netflixTriedAt = now;
                 List<Pick> made = fetchNetflix(pkg);
@@ -441,9 +449,9 @@ final class Recs {
                 JSONArray a = new JSONArray();
                 for (Pick p : made) {
                     a.put(new JSONObject().put("id", p.id).put("kind", p.kind).put("title", p.title).put("backdrop", p.backdrop)
-                            .put("new", p.label == ArrivalsLogic.NEW_ON).put("top10", p.top10));
+                            .put("new", p.label == ArrivalsLogic.NEW_ON).put("top10", p.top10).put("lang", p.lang == null ? "" : p.lang).put("poster", p.poster));
                 }
-                cache.edit().putString("nf:pool", a.toString()).putLong("nf:at2", netflixTopRead ? now : 0).apply();
+                cache.edit().putString("nf:pool", a.toString()).putLong("nf:at5", netflixTopRead ? now : 0).apply();
                 AppLog.w("netflix: pool of " + made.size() + (netflixTopRead ? "" : " (no Top 10 yet)"));
                 post(done);
             } catch (Exception e) {
@@ -461,8 +469,11 @@ final class Recs {
             for (int i = 0; i < a.length(); i++) {
                 JSONObject o = a.getJSONObject(i);
                 if (o.optInt("id") <= 0 || o.optString("backdrop").isEmpty()) continue;
-                out.add(netflixPick(o.optInt("id"), o.optString("kind"), o.optString("title"), o.optString("backdrop"),
-                        o.optBoolean("new"), o.optInt("top10"), pkg));
+                Pick p = netflixPick(o.optInt("id"), o.optString("kind"), o.optString("title"), o.optString("backdrop"),
+                        o.optBoolean("new"), o.optInt("top10"), pkg);
+                p.lang = o.optString("lang", "");
+                p.poster = o.optString("poster", "");
+                out.add(p);
             }
         } catch (org.json.JSONException e) {
             AppLog.w("netflix: cache unreadable");
@@ -503,15 +514,20 @@ final class Recs {
             List<Pick> l = new ArrayList<>();
             for (int i = 0; r != null && i < r.length() && l.isEmpty(); i++) add(l, r.getJSONObject(i), kind);
             if (l.isEmpty()) continue;
-            byName.put(NetflixLogic.norm(t.name), netflixPick(l.get(0).id, kind, t.name, l.get(0).backdrop, false, t.rank, pkg));
+            Pick tp = netflixPick(l.get(0).id, kind, t.name, l.get(0).backdrop, false, t.rank, pkg);
+            tp.lang = l.get(0).lang;
+            tp.poster = l.get(0).poster;
+            byName.put(NetflixLogic.norm(t.name), tp);
             found.add(t);
         }
         List<JSONObject> fresh = new ArrayList<>();
-        for (String kind : new String[] {"movie", "tv"}) {
+        for (String q : new String[] {"movie", "tv", "movie:in", "tv:in"}) {   // ":in": Indian languages only (they lead)
+            String kind = q.startsWith("movie") ? "movie" : "tv";
             String date = kind.equals("movie") ? "primary_release_date" : "first_air_date";
             JSONArray r = get("/discover/" + kind + "?with_watch_providers=" + NETFLIX_PROVIDER + "&watch_region=" + REGION
                     + "&with_watch_monetization_types=flatrate&sort_by=" + date + ".desc&" + date + ".lte=" + day(0)
-                    + "&" + date + ".gte=" + day(-120) + "&vote_count.gte=3").optJSONArray("results");
+                    + "&" + date + ".gte=" + day(-120) + (q.endsWith(":in") ? "&with_original_language=hi%7Cta%7Cte%7Cml%7Ckn" : "&vote_count.gte=3"))
+                    .optJSONArray("results");
             for (int i = 0; r != null && i < r.length(); i++) {
                 JSONObject o = r.getJSONObject(i);
                 fresh.add(o.put("_kind", kind).put("_date", o.optString(date)));
@@ -519,35 +535,112 @@ final class Recs {
         }
         java.util.Collections.sort(fresh, (a, b) -> b.optString("_date").compareTo(a.optString("_date")));
         List<NetflixLogic.Title> added = new ArrayList<>();
-        for (JSONObject o : fresh) {
-            List<Pick> l = new ArrayList<>();
-            add(l, o, o.optString("_kind"));
-            if (l.isEmpty() || byName.containsKey(NetflixLogic.norm(l.get(0).title))) continue;
-            byName.put(NetflixLogic.norm(l.get(0).title), netflixPick(l.get(0).id, l.get(0).kind, l.get(0).title, l.get(0).backdrop, true, 0, pkg));
-            added.add(new NetflixLogic.Title(l.get(0).title, NetflixLogic.NEW, 0));
+        int indian = 0, other = 0;   // 3 Indian new titles and 2 others (fewer of one: more of the other)
+        for (int pass = 0; pass < 2; pass++) {
+            for (JSONObject o : fresh) {
+                List<Pick> l = new ArrayList<>();
+                add(l, o, o.optString("_kind"));
+                if (l.isEmpty() || byName.containsKey(NetflixLogic.norm(l.get(0).title))) continue;
+                boolean in = MixLogic.indian(l.get(0).lang);
+                if (pass == 0 && (in ? indian >= 3 : other >= 2)) continue;
+                if (added.size() >= NetflixLogic.POOL_EACH) break;
+                if (in) indian++; else other++;
+                Pick np = netflixPick(l.get(0).id, l.get(0).kind, l.get(0).title, l.get(0).backdrop, true, 0, pkg);
+                np.lang = l.get(0).lang;
+                np.poster = l.get(0).poster;
+                byName.put(NetflixLogic.norm(l.get(0).title), np);
+                added.add(new NetflixLogic.Title(l.get(0).title, NetflixLogic.NEW, 0));
+            }
         }
         List<Pick> out = new ArrayList<>();
+        Set<String> ids = new HashSet<>();   // the same title under two names ("Akka" and "Akka: The Protectors"): once
         for (NetflixLogic.Title t : NetflixLogic.pool(found, added)) {
             Pick p = byName.get(NetflixLogic.norm(t.name));
-            if (p != null) out.add(p);
+            if (p != null && ids.add(p.kind + p.id)) out.add(p);
         }
         return out;
     }
 
+    /** Bumped when titles' languages arrive (fillLangs): Home's mix is made again with them. */
+    private volatile int langStamp;
+
+    /** The seed of Home's mix: the apps' list, the hour (a new mix every hour) and the languages known. */
+    long mixSeed() {
+        return appSeed * 31 + System.currentTimeMillis() / 3600_000L + langStamp * 7919L;
+    }
+
+    /** A title's original language: its own (TMDB, Crunchyroll's anime), else the one looked up for its name (fillLangs). */
+    private String langOf(Pick p) {
+        if (p.lang != null && !p.lang.isEmpty()) return p.lang;
+        String t = p.title == null ? "" : p.title.toLowerCase(Locale.ROOT);
+        if (t.contains("(hindi)")) return "hi";
+        if (t.contains("(tamil)")) return "ta";
+        if (t.contains("(telugu)")) return "te";
+        String l = cache.getString("lang:" + AppContentLogic.normTitle(langName(p.title)), "");
+        return "-".equals(l) ? "" : l;
+    }
+
+    /** The name to look up: without " - Season 2" or "(Hindi)". */
+    private static String langName(String title) {
+        if (title == null) return "";
+        return title.replaceAll("(?i)\\s*[-:]\\s*season\\s*\\d+.*$", "").replaceAll("\\s*\\([^)]*\\)\\s*", " ").trim();
+    }
+
+    /** Looks up, once each (TMDB), the original language of the apps' titles Home doesn't know yet; then a new mix. */
+    private void fillLangs(List<Pick> titles, Runnable done) {
+        if (readKey() == null || titles == null || titles.isEmpty()) return;
+        netflixIo.execute(() -> {
+            int found = 0, asked = 0;
+            for (Pick p : titles) {
+                String name = langName(p.title), key = "lang:" + AppContentLogic.normTitle(name);
+                if (asked >= 30 || name.isEmpty() || cache.contains("poster:" + AppContentLogic.normTitle(name))) continue;
+                asked++;
+                try {
+                    JSONArray r = get("/search/multi?query=" + URLEncoder.encode(name, "UTF-8")).optJSONArray("results");
+                    String lang = "-", poster = "";
+                    for (int i = 0; r != null && i < r.length(); i++) {
+                        JSONObject o = r.getJSONObject(i);
+                        String type = o.optString("media_type");
+                        if (!type.equals("movie") && !type.equals("tv")) continue;
+                        lang = o.optString("original_language", "-");
+                        poster = o.optString("poster_path", "");
+                        if ("null".equals(poster)) poster = "";
+                        break;
+                    }
+                    cache.edit().putString(key, lang.isEmpty() ? "-" : lang)
+                            .putString("poster:" + AppContentLogic.normTitle(name), poster).apply();
+                    if (!poster.isEmpty()) found++;
+                    if (!"-".equals(lang)) found++;
+                } catch (Exception e) {
+                    AppLog.w("title language: " + e.getMessage());
+                    break;
+                }
+            }
+            if (found > 0) {
+                langStamp++;
+                AppLog.w("title languages: " + found + " found");
+                post(done);
+            }
+        });
+    }
+
     /** Home's Netflix tiles for this part of the day: 4 of the pool, at least one Top 10 movie, show and new title. */
-    private List<Pick> netflixShown() {
+    private List<Pick> netflixShown(long mix, int mood) {
         List<Pick> pool = netflixPool;
         List<Pick> out = new ArrayList<>();
         if (pool == null || pool.isEmpty()) return out;
         Map<NetflixLogic.Title, Pick> of = new java.util.IdentityHashMap<>();
+        Set<NetflixLogic.Title> preferred = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
         List<NetflixLogic.Title> titles = new ArrayList<>();
         for (Pick p : pool) {
             int kind = p.label == ArrivalsLogic.NEW_ON ? NetflixLogic.NEW : "movie".equals(p.kind) ? NetflixLogic.MOVIE : NetflixLogic.SHOW;
             NetflixLogic.Title t = new NetflixLogic.Title(p.title, kind, p.top10);
             titles.add(t);
             of.put(t, p);
+            String lang = langOf(p);
+            if (mood == MixLogic.INDIAN ? MixLogic.indian(lang) : mood == MixLogic.HOLLYWOOD ? "en".equals(lang) : MixLogic.indian(lang)) preferred.add(t);
         }
-        for (NetflixLogic.Title t : NetflixLogic.pick(titles, NetflixLogic.SHOWN, appSeed)) out.add(of.get(t));
+        for (NetflixLogic.Title t : NetflixLogic.pick(titles, NetflixLogic.SHOWN, mix, mood == MixLogic.MIX ? null : preferred)) out.add(of.get(t));
         return out;
     }
 
@@ -581,6 +674,7 @@ final class Recs {
     void refreshAppContent(Runnable done) {
         observeApps();
         refreshNetflix(done);
+        if (appContent != null && !appContent.isEmpty()) fillLangs(appContent, done);
         if (!AppContentLogic.mayRead(appFailedAt, System.currentTimeMillis())) return;
         if (!appRunning.compareAndSet(false, true)) return;
         appIo.execute(() -> {
@@ -633,6 +727,7 @@ final class Recs {
                 String why = AppContentLogic.why(appSignature, sig, appPeriod, p);
                 appRecords = merged;
                 appContent = appPicks(merged);
+                fillLangs(appContent, done);
                 appSignature = sig;
                 appPeriod = p;
                 appSeed = now == appSeed ? now + 1 : now;
@@ -676,9 +771,12 @@ final class Recs {
             p.kind = "app";
             p.id = (r.pkg + "|" + AppContentLogic.normTitle(r.title)).hashCode();
             p.title = r.title;
-            p.backdrop = r.art;
+            String[] art = AppContentLogic.cleanArt(r.art);   // Prime Video's drawn-in badge: off the art, onto the chip
+            p.backdrop = art[0];
+            p.badge = art[1];
             p.pkg = r.pkg;
             p.app = r.service();
+            if ("crunchyroll".equals(p.app)) p.lang = "ja";
             p.link = r.link;
             p.detailed = true;   // nothing to look up: the app said it all
             out.add(p);
@@ -2042,6 +2140,16 @@ final class Recs {
     static String labelText(Pick p) {
         if (p == null) return "";
         if (p.top10 > 0) return "Top 10 · #" + p.top10;   // the same in every language
+        if (p.badge != null && !p.badge.isEmpty()) {
+            switch (p.badge) {
+                case "NEW MOVIE": return Ui.tr("New movie");
+                case "NEW SERIES": return Ui.tr("New series");
+                case "NEW SEASON": return Ui.tr("New season");
+                case "NEW EPISODE": return Ui.tr("New episode");
+                case "TOP 10": return "Top 10";
+                default: break;
+            }
+        }
         switch (p.label) {
             case ArrivalsLogic.NEW_ON:
                 String name = p.labelApp == null ? null : SERVICE_NAME.get(p.labelApp);
@@ -2503,6 +2611,8 @@ final class Recs {
         p.kind = kind;
         p.title = o.optString(kind.equals("movie") ? "title" : "name");
         p.backdrop = backdrop;
+        String poster = o.optString("poster_path", "");
+        p.poster = "null".equals(poster) ? "" : poster;
         p.lang = o.optString("original_language", "");   // known before the details: "hi" for the Bollywood mix
         list.add(p);
     }
@@ -3110,7 +3220,8 @@ final class Recs {
                         .put("date", p.date == null ? "" : p.date).put("followed", p.followed)
                         .put("lang", p.lang == null ? "" : p.lang).put("origin", p.origin == null ? "" : p.origin)
                         .put("trend", p.trend).put("tLang", p.tLang).put("tCountry", p.tCountry).put("anime", p.anime)
-                        .put("tier", p.tier).put("label", p.label).put("labelApp", p.labelApp == null ? "" : p.labelApp);
+                        .put("tier", p.tier).put("label", p.label).put("labelApp", p.labelApp == null ? "" : p.labelApp)
+                        .put("badge", p.badge == null ? "" : p.badge);
     }
 
     private void save() {
@@ -3176,6 +3287,7 @@ final class Recs {
             p.tier = o.optInt("tier", TIER_OLDER);
             p.label = o.optInt("label", ArrivalsLogic.NONE);
             p.labelApp = o.optString("labelApp", "");
+            p.badge = o.optString("badge", "");
             if (p.labelApp.isEmpty()) p.labelApp = null;
             out.add(p);
         }

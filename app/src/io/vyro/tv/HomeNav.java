@@ -8,13 +8,13 @@ public final class HomeNav {
     private HomeNav() {}
 
     /**
-     * Home without Continue Watching: 11 picks over the whole area, 8 columns × 3 rows ({column, row, columns, rows}):
-     * the large card, two tall ones, wide ones in different places on each row, one long and one small on the last.
+     * Home without Continue Watching, a mosaic of 9 over 8 columns × 3 rows ({column, row, columns, rows}): the large
+     * landscape card, two posters, two wide cards stacked, then four wide ones (each shape gets its own art: posters
+     * for the tall ones, the apps' landscape art for the rest).
      */
     public static final int[][] BENTO_FULL = {
-        {0, 0, 2, 2}, {2, 0, 2, 1}, {4, 0, 1, 2}, {5, 0, 2, 1}, {7, 0, 1, 2},
-        {2, 1, 2, 1}, {5, 1, 2, 1},
-        {0, 2, 3, 1}, {3, 2, 1, 1}, {4, 2, 2, 1}, {6, 2, 2, 1},
+        {0, 0, 4, 2}, {4, 0, 1, 2}, {5, 0, 1, 2}, {6, 0, 2, 1}, {6, 1, 2, 1},
+        {0, 2, 2, 1}, {2, 2, 2, 1}, {4, 2, 2, 1}, {6, 2, 2, 1},
     };
 
     /**

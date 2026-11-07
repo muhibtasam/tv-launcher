@@ -32,10 +32,10 @@ public class ContinueLogicTest {
         check("empty", ids(new ArrayList<>()).isEmpty());
         check("null", ContinueLogic.select(null, NOW, APPS::contains).isEmpty());
 
-        // Newest first is kept, at most four.
+        // Newest first is kept, at most eight (the row slides along).
         List<Entry> many = new ArrayList<>();
-        for (int i = 1; i <= 6; i++) many.add(e(i, "movie", "netflix", NOW - i * HOUR));
-        check("max four, in order", ids(many).equals(Arrays.asList(1, 2, 3, 4)));
+        for (int i = 1; i <= 10; i++) many.add(e(i, "movie", "netflix", NOW - i * HOUR));
+        check("max eight, in order", ids(many).equals(Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8)));
 
         // Older than 30 days: gone. Exactly 30 days: kept.
         check("30-day window", ids(Arrays.asList(e(1, "tv", "netflix", NOW - 30 * DAY), e(2, "tv", "netflix", NOW - 31 * DAY)))

@@ -110,10 +110,18 @@ public final class NetflixLogic {
      * the seed), then the rest at random; the same seed gives the same titles in the same order.
      */
     public static List<Title> pick(List<Title> pool, int n, long seed) {
+        return pick(pool, n, seed, null);
+    }
+
+    /** pick, the `preferred` titles (the hour's Indian or Hollywood ones) chosen before the others of their list. */
+    public static List<Title> pick(List<Title> pool, int n, long seed, Set<Title> preferred) {
         List<Title> out = new ArrayList<>();
         if (pool == null || n <= 0) return out;
         List<Title> rest = new ArrayList<>(pool);
-        Collections.sort(rest, (a, b) -> Double.compare(MixLogic.unit(seed, a.name), MixLogic.unit(seed, b.name)));
+        Collections.sort(rest, (a, b) -> {
+            int pa = preferred != null && preferred.contains(a) ? 0 : 1, pb = preferred != null && preferred.contains(b) ? 0 : 1;
+            return pa != pb ? pa - pb : Double.compare(MixLogic.unit(seed, a.name), MixLogic.unit(seed, b.name));
+        });
         for (int kind = MOVIE; kind <= NEW && out.size() < n; kind++)
             for (Title t : rest) if (t.kind == kind) { out.add(t); break; }
         for (Title t : rest) {

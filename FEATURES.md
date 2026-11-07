@@ -74,3 +74,9 @@ check · 1.0.8 personal settings kept.
 - Netflix publishes nothing to launchers, so Home adds 4 Netflix tiles (slots 0, 3, 6, 9) from a pool of 5 Top 10 movies, 5 Top 10 shows and 5 newest titles on Netflix in the region.
 - Top 10: `tools/netflix_top10.py` (run weekly by `pages.yml`) writes `docs/netflix-top10.tsv` to the site; the app reads it every 12 h. Newest titles and artwork: TMDB (needs the TMDB key). Logic: `NetflixLogic` (tests: `NetflixLogicTest`), wiring: `Recs.refreshNetflix` / `netflixShown`.
 - Tiles open through TitleLaunch (Watchmode link, `com.netflix.ninja`). Chip on focus: "Top 10 · #n" or "New on Netflix".
+
+## Home mosaic, hourly mix, Prime badges (1.1.0)
+- Grid is a mosaic: with Continue Watching 6 tiles (large landscape, 3 posters, 2 wide), without it 9. Tall tiles show TMDB posters (`Pick.poster`, from `fillLangs`), others the apps' landscape art; art of another shape is shown whole over a soft blur.
+- Prime Video's drawn-in badge is cut from its art URL (`AppContentLogic.cleanArt`) and drawn as VYRO's own chip ("New movie", "New series", "Top 10").
+- Each hour has a mood (`MixLogic.mood`): Indian first half the hours, Hollywood a quarter, mixed a quarter; languages from TMDB, cached.
+- Continue Watching: up to 8 16:9 cards under a For You style heading, sliding along (`contScroll`).

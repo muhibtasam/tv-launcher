@@ -225,6 +225,17 @@ public class AppContentLogicTest {
         List<MixLogic.Item> one = AppContentLogic.items(AppContentLogic.select(tv, installed(CR)));
         eq("one app: fills all 15", 15, MixLogic.pick(one, 15, 9L).size());
 
+        // Prime Video's drawn-in badge: the clean address and the badge's words.
+        String pv = "https://images-eu.ssl-images-amazon.com/images/S/pv-target-images/ab12._UR1920,1080_._PIpvoutofapprecs-hvm-badge-white-bk-630,TopRight,-30,30_._ZANEW%2520MOVIE,1290,34,121,570,AmazonEmberBold,75,0,5,13_QL65_._FMjpg_.jpg";
+        String[] ca = AppContentLogic.cleanArt(pv);
+        eq("prime art: badge cut", "https://images-eu.ssl-images-amazon.com/images/S/pv-target-images/ab12._UR1920,1080_._QL65_._FMjpg_.jpg", ca[0]);
+        eq("prime art: its words", "NEW MOVIE", ca[1]);
+        eq("prime art: top 10", "TOP 10", AppContentLogic.cleanArt(pv.replace("NEW%2520MOVIE", "TOP%252010"))[1]);
+        eq("art without a badge: as is", "https://x/y._FMjpg_.png", AppContentLogic.cleanArt("https://x/y._FMjpg_.png")[0]);
+        eq("art without a badge: no words", "", AppContentLogic.cleanArt("https://x/y._FMjpg_.png")[1]);
+        yes("no art", AppContentLogic.cleanArt(null)[0] == null && AppContentLogic.cleanArt(null)[1].isEmpty());
+        eq("odd words dropped", "", AppContentLogic.cleanArt(pv.replace("NEW%2520MOVIE", "%3Cb%3E"))[1]);
+
         if (failures > 0) {
             System.out.println("AppContentLogicTest: " + failures + " failed");
             System.exit(1);

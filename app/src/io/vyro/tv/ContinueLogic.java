@@ -16,7 +16,7 @@ import java.util.function.Predicate;
  */
 public final class ContinueLogic {
     /** Cards in the row, and how long a title stays in it after it was opened. */
-    public static final int MAX = 4;
+    public static final int MAX = 8;
     public static final long WINDOW_MS = 30L * 24 * 3600_000L;
 
     private ContinueLogic() {

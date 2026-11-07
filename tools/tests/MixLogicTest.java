@@ -121,6 +121,23 @@ public class MixLogicTest {
             }
         }
 
+        // The hour's mix: Indian titles first in an Indian hour, from whichever app has them; moods vary by hour.
+        java.util.Set<Integer> moods = new java.util.HashSet<>();
+        int indianHours = 0;
+        for (long h = 0; h < 400; h++) { int m = MixLogic.mood(h); moods.add(m); if (m == MixLogic.INDIAN) indianHours++; }
+        yes("all three moods happen", moods.size() == 3);
+        yes("Indian about half the hours", indianHours > 150 && indianHours < 250);
+        yes("Indian hour: Hindi before English", MixLogic.priority(MixLogic.INDIAN, "hi", false) < MixLogic.priority(MixLogic.INDIAN, "en", true));
+        yes("Hollywood hour: English before Hindi", MixLogic.priority(MixLogic.HOLLYWOOD, "en", false) < MixLogic.priority(MixLogic.HOLLYWOOD, "hi", true));
+        yes("unknown language last", MixLogic.priority(MixLogic.INDIAN, "", true) > MixLogic.priority(MixLogic.INDIAN, "en", false));
+        yes("Tamil counts as Indian", MixLogic.indian("ta") && !MixLogic.indian("en") && !MixLogic.indian(null));
+        List<Item> lang = new ArrayList<>();
+        for (int i = 0; i < 8; i++) lang.add(new Item("anime:" + i, "crunchyroll", MixLogic.priority(MixLogic.INDIAN, "ja", i < 4)));
+        for (int i = 0; i < 6; i++) lang.add(new Item("prime:" + i, "prime", MixLogic.priority(MixLogic.INDIAN, i < 3 ? "hi" : "en", i < 4)));
+        List<Integer> lp = MixLogic.pick(lang, 6, 5);
+        yes("Indian hour: the Hindi titles lead", lang.get(lp.get(0)).key.startsWith("prime:") && lang.get(lp.get(1)).key.startsWith("prime:")
+                && lang.get(lp.get(2)).key.startsWith("prime:"));
+
         // Publishing: the grid on screen stays until a new list's candidates are resolved; a failed refresh keeps it.
         yes("same list, grid on screen: keep it (redraws, navigation, a failed refresh)", !MixLogic.publish(true, false, true, true, false));
         yes("new list, details still arriving: keep the old grid", !MixLogic.publish(true, true, false, false, true));
