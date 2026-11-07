@@ -141,4 +141,67 @@ public final class GamesLogic {
         int cut = t.lastIndexOf(' ', max - 1);
         return t.substring(0, cut > 0 ? cut : max - 1).trim() + "…";
     }
+
+    // MARK: - IGDB rows (Twitch): the Games rows' first source; RAWG only where IGDB gives nothing
+
+    private static final Pattern IGDB_IMAGE_ID = Pattern.compile("[a-z0-9]{4,40}");
+
+    /** An IGDB image address (t_1080p, t_cover_big…) for an image id, or "" for a missing or malformed one. */
+    public static String igdbImage(String imageId, String size) {
+        if (imageId == null || !IGDB_IMAGE_ID.matcher(imageId).matches()) return "";
+        if (size == null || !size.matches("[a-z0-9_]{2,20}")) return "";
+        return "https://images.igdb.com/igdb/image/upload/t_" + size + "/" + imageId + ".jpg";
+    }
+
+    /** IGDB's release date (Unix seconds) as yyyy-MM-dd in UTC, or "" for none. */
+    public static String igdbDate(long seconds) {
+        if (seconds <= 0) return "";
+        java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT);
+        f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+        return f.format(new java.util.Date(seconds * 1000L));
+    }
+
+    private static final String[][] IGDB_PLATFORMS = {{"PlayStation 5", "PS5"}, {"Xbox Series X|S", "Xbox Series"},
+            {"PC (Microsoft Windows)", "PC"}, {"Nintendo Switch 2", "Switch 2"}, {"Nintendo Switch", "Switch"},
+            {"PlayStation 4", "PS4"}, {"Xbox One", "Xbox One"}, {"Mac", "Mac"}, {"iOS", "iOS"}, {"Android", "Android"}};
+
+    /** The newest platforms first, in short names, at most three: "PS5 · Xbox Series · PC". */
+    public static String igdbPlatforms(java.util.Collection<String> names) {
+        StringBuilder out = new StringBuilder();
+        int n = 0;
+        for (String[] p : IGDB_PLATFORMS) {
+            if (names == null || !names.contains(p[0]) || n >= 3) continue;
+            if (n++ > 0) out.append(" · ");
+            out.append(p[1]);
+        }
+        return out.toString();
+    }
+
+    public static final String IGDB_RECENT = "recent", IGDB_UPCOMING = "upcoming", IGDB_POPULAR = "popular";
+
+    /**
+     * The IGDB query for one Games row at `now` (Unix seconds): main games only (no DLC or editions: version_parent
+     * and parent_game empty), with a cover, never erotic (theme 42); recent = out in the last 60 days, newest first;
+     * upcoming = the next 365 days, most followed first; popular = the last 365 days, most rated first.
+     */
+    public static String igdbQuery(String row, long now, int limit) {
+        long day = 86_400L;
+        String fields = "fields name,first_release_date,summary,hypes,total_rating,total_rating_count,cover.image_id,"
+                + "artworks.image_id,screenshots.image_id,platforms.name,genres.name;";
+        String base = "version_parent = null & parent_game = null & cover != null & themes != (42)";
+        String where, sort;
+        if (IGDB_UPCOMING.equals(row)) {
+            where = base + " & first_release_date > " + now + " & first_release_date < " + (now + 365 * day) + " & hypes > 3";
+            sort = "hypes desc";
+        } else if (IGDB_POPULAR.equals(row)) {
+            where = base + " & first_release_date > " + (now - 365 * day) + " & first_release_date <= " + now
+                    + " & total_rating_count > 3";
+            sort = "total_rating_count desc";
+        } else {
+            where = base + " & first_release_date > " + (now - 60 * day) + " & first_release_date <= " + now
+                    + " & (hypes > 15 | total_rating_count > 5)";
+            sort = "first_release_date desc";
+        }
+        return fields + " where " + where + "; sort " + sort + "; limit " + Math.max(1, Math.min(limit, 50)) + ";";
+    }
 }

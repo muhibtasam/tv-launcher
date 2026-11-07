@@ -55,8 +55,9 @@ final class Games {
         return instance;
     }
 
+    /** A source for the rows: IGDB (Twitch, first) or RAWG. */
     static boolean configured() {
-        return !BuildKeys.rawg().trim().isEmpty();
+        return igdbOn() || !BuildKeys.rawg().trim().isEmpty();
     }
 
     private final Context context;
@@ -268,7 +269,7 @@ final class Games {
                 if (fetchRows) {
                     try {
                         List<Discover.Row> fresh = fetchRows();
-                        if (fresh.isEmpty()) throw new IOException("RAWG returned nothing");
+                        if (fresh.isEmpty()) throw new IOException("no games came back");
                         rows = fresh;
                         aboutAll();
                         fetchedAt = System.currentTimeMillis();
@@ -321,7 +322,89 @@ final class Games {
      * The featured carousel: the 3 most added recent games and the 2 most added upcoming ones, in turn. Its pictures are
      * each game's own main art (RAWG), nothing else. What stage 2 found before (logos, scores) is kept by game id.
      */
+    /**
+     * The rows: IGDB first (Twitch's keys), RAWG only when IGDB is off or gives nothing (RAWG is unreachable on some
+     * networks). Both bring the same rows: recently released, popular this year, upcoming.
+     */
     private List<Discover.Row> fetchRows() throws Exception {
+        Exception igdbFailed = null;
+        if (igdbOn()) {
+            try {
+                List<Discover.Row> out = igdbRows();
+                if (!out.isEmpty()) return out;
+                igdbFailed = new IOException("IGDB returned nothing");
+            } catch (Exception e) {
+                igdbFailed = e;
+                AppLog.w("games igdb rows: " + e.getMessage());
+            }
+        }
+        if (BuildKeys.rawg().trim().isEmpty()) throw igdbFailed != null ? igdbFailed : new IOException("no games source");
+        return rawgRows();
+    }
+
+    private List<Discover.Row> igdbRows() throws Exception {
+        long now = System.currentTimeMillis() / 1000;
+        Discover.Row recent = igdbRow(GamesLogic.IGDB_RECENT, RECENT, Ui.tr("Recently released"), now, PER_ROW);
+        Discover.Row popular = igdbRow(GamesLogic.IGDB_POPULAR, POPULAR, Ui.tr("Popular this year"), now, 40);
+        Discover.Row upcoming = igdbRow(GamesLogic.IGDB_UPCOMING, UPCOMING, Ui.tr("Upcoming"), now, PER_ROW);
+        return assemble(recent, upcoming, popular);
+    }
+
+    /** One row from IGDB; null when it fails (the others still show). */
+    private Discover.Row igdbRow(String which, String key, String name, long now, int max) {
+        try {
+            JSONArray games = new JSONArray(igdbPost("games", GamesLogic.igdbQuery(which, now, 50)));
+            Discover.Row r = new Discover.Row();
+            r.key = key;
+            r.name = name;
+            for (int i = 0; i < games.length() && r.items.size() < max; i++) {
+                JSONObject g = games.optJSONObject(i);
+                if (g == null || g.optString("name").isEmpty()) continue;
+                JSONObject cover = g.optJSONObject("cover");
+                String poster = GamesLogic.igdbImage(cover == null ? null : cover.optString("image_id", null), "cover_big");
+                String wide = firstImage(g.optJSONArray("artworks"));
+                if (wide.isEmpty()) wide = firstImage(g.optJSONArray("screenshots"));
+                if (poster.isEmpty() && wide.isEmpty()) continue;
+                Discover.Title t = new Discover.Title();
+                t.id = 1_000_000_000 + g.optInt("id");   // apart from RAWG's ids (saved finds are keyed by id)
+                t.kind = "game";
+                t.title = g.optString("name");
+                t.backdrop = wide.isEmpty() ? poster : wide;
+                t.poster = poster.isEmpty() ? wide : poster;
+                t.rawg = t.backdrop;   // Games V1's wide art
+                t.date = GamesLogic.igdbDate(g.optLong("first_release_date"));
+                java.util.List<String> platforms = new ArrayList<>();
+                JSONArray pa = g.optJSONArray("platforms");
+                for (int j = 0; pa != null && j < pa.length(); j++) {
+                    JSONObject p = pa.optJSONObject(j);
+                    if (p != null) platforms.add(p.optString("name"));
+                }
+                t.platforms = GamesLogic.igdbPlatforms(platforms);
+                t.genres = genre(g.optJSONArray("genres"));
+                t.overview = GamesLogic.summary(g.optString("summary", ""), 220);
+                t.rating = (float) (g.optDouble("total_rating", 0) / 20);   // 0–100 → the 0–5 the cards show
+                t.ratings = g.optInt("total_rating_count");
+                t.added = t.ratings;
+                t.hypes = g.optInt("hypes");
+                r.items.add(t);
+            }
+            return r;
+        } catch (Exception e) {
+            AppLog.w("games igdb " + which + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static String firstImage(JSONArray a) {
+        for (int i = 0; a != null && i < a.length(); i++) {
+            JSONObject o = a.optJSONObject(i);
+            String url = GamesLogic.igdbImage(o == null ? null : o.optString("image_id", null), "1080p");
+            if (!url.isEmpty()) return url;
+        }
+        return "";
+    }
+
+    private List<Discover.Row> rawgRows() throws Exception {
         String today = Recs.day(0);
         ExecutorService pool = Recs.lowPriority(3);
         try {
@@ -332,6 +415,16 @@ final class Games {
             Future<Discover.Row> popularF = pool.submit(() -> row(POPULAR, Ui.tr("Popular this year"),
                     "&dates=" + Recs.day(-365) + "," + today + "&ordering=-added", 40));
             Discover.Row recent = take(recentF, "recent"), upcoming = take(upcomingF, "upcoming"), popular = take(popularF, "popular");
+            if (recent == null && upcoming == null && popular == null) throw new IOException("RAWG didn't answer");
+            return assemble(recent, upcoming, popular);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    /** The page's rows in order (recent, popular, upcoming), with stage 2's earlier finds kept on them. */
+    private List<Discover.Row> assemble(Discover.Row recent, Discover.Row upcoming, Discover.Row popular) {
+        {
             List<Discover.Row> out = new ArrayList<>();
             if (recent != null && !recent.items.isEmpty()) {
                 java.util.Collections.sort(recent.items, (a, b) -> b.date.compareTo(a.date));   // newest first
@@ -355,7 +448,6 @@ final class Games {
                 java.util.Collections.sort(upcoming.items, (a, b) -> a.date.compareTo(b.date));   // soonest first
                 out.add(upcoming);
             }
-            if (recent == null && upcoming == null && popular == null) throw new IOException("RAWG didn't answer");
             // Stage 2's finds from before, by game id (no flicker: the logo and scores stay while the rows refresh).
             java.util.Map<Integer, Discover.Title> before = new java.util.HashMap<>();
             for (Discover.Row r : rows) {
@@ -369,8 +461,6 @@ final class Games {
             }
             applyCritics(out);
             return out;
-        } finally {
-            pool.shutdownNow();
         }
     }
 

@@ -11,6 +11,24 @@ public class GamesLogicTest {
     private static boolean near(float a, float b) { return Math.abs(a - b) < 0.01f; }
 
     public static void main(String[] args) {
+        // IGDB (the rows' first source): what it sends is never trusted.
+        check("igdb image", GamesLogic.igdbImage("co5vmg", "cover_big").equals("https://images.igdb.com/igdb/image/upload/t_cover_big/co5vmg.jpg"));
+        check("igdb image: missing id", GamesLogic.igdbImage(null, "1080p").isEmpty());
+        check("igdb image: malformed id", GamesLogic.igdbImage("../x", "1080p").isEmpty() && GamesLogic.igdbImage("AB<script>", "1080p").isEmpty());
+        check("igdb image: bad size", GamesLogic.igdbImage("co5vmg", "x/../y").isEmpty());
+        check("igdb date", GamesLogic.igdbDate(1730851200L).equals("2024-11-06"));
+        check("igdb date: none", GamesLogic.igdbDate(0).isEmpty() && GamesLogic.igdbDate(-5).isEmpty());
+        check("igdb platforms: newest first, three", GamesLogic.igdbPlatforms(java.util.Arrays.asList("PC (Microsoft Windows)",
+                "PlayStation 4", "PlayStation 5", "Xbox Series X|S")).equals("PS5 · Xbox Series · PC"));
+        check("igdb platforms: none known", GamesLogic.igdbPlatforms(java.util.Arrays.asList("Atari 2600")).isEmpty());
+        check("igdb platforms: null", GamesLogic.igdbPlatforms(null).isEmpty());
+        String q = GamesLogic.igdbQuery(GamesLogic.IGDB_UPCOMING, 1_000_000L, 50);
+        check("igdb upcoming: future only, most followed", q.contains("first_release_date > 1000000") && q.contains("sort hypes desc"));
+        check("igdb: main games, no erotic, with a cover", q.contains("version_parent = null") && q.contains("themes != (42)") && q.contains("cover != null"));
+        check("igdb recent: newest first", GamesLogic.igdbQuery(GamesLogic.IGDB_RECENT, 1_000_000L, 50).contains("sort first_release_date desc"));
+        check("igdb popular: most rated", GamesLogic.igdbQuery(GamesLogic.IGDB_POPULAR, 1_000_000L, 50).contains("sort total_rating_count desc"));
+        check("igdb limit clamped", GamesLogic.igdbQuery(GamesLogic.IGDB_RECENT, 1L, 500).endsWith("limit 50;"));
+
         // The rail loops: moving past either end comes round to the other.
         check("wrap forward past the end", GamesLogic.wrap(10, 10) == 0);
         check("wrap backward before the start", GamesLogic.wrap(-1, 10) == 9);

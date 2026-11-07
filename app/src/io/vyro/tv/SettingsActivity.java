@@ -241,7 +241,7 @@ public class SettingsActivity extends Activity {
                 updates = Updates.state(getContext());
                 updateReady = Updates.available(getContext()) != null;
                 alertsOn = GoogleAlerts.on(getContext());
-                if (screen == HOME_SETTINGS && pickScroll + focus == updatesRow() && !updatesWas.equals(updatesValue())) {
+                if (screen == MAIN && focus == MAIN_UPDATES && !updatesWas.equals(updatesValue())) {
                     spoken.focusMoved();   // TalkBack reads the Updates row's new value
                 }
                 boolean nowBusy = !busyText().isEmpty();
@@ -332,6 +332,7 @@ public class SettingsActivity extends Activity {
                     }
                     String[] names = {Ui.tr("Screensaver, preview"), Ui.tr("Home Settings"), Ui.tr("Tabs"),
                             Ui.tr("Shelf"), Ui.tr("Top Buttons"), Ui.tr("Remote Buttons"), Ui.tr("Sleep Timer"),
+                            Ui.tr("Updates") + ", " + updatesValue(), Ui.tr("Google notifications") + ", " + alertsValue(),
                             Ui.tr("TV Settings")};
                     return row - 1 < names.length ? names[row - 1] : "";
                 }
@@ -544,7 +545,7 @@ public class SettingsActivity extends Activity {
 
         private int rowCount() {
             switch (screen) {
-                case MAIN: return 9;
+                case MAIN: return 11;
                 case TABS: return 3;
                 case HOME_CHOICE: return 2;
                 case HOME_SETTINGS: return Math.min(SETTINGS_VISIBLE, settingLabels().length);
@@ -601,8 +602,9 @@ public class SettingsActivity extends Activity {
             String mode = freeActive() ? "VYRO" : Ui.tr("Original");
             String[] labels = {Ui.tr("Home Screen"), Ui.tr("Screensaver"),
                     Ui.tr("Home Settings"), Ui.tr("Tabs"), Ui.tr("Shelf"), Ui.tr("Top Buttons"),
-                    Ui.tr("Remote Buttons"), Ui.tr("Sleep Timer"), Ui.tr("TV Settings")};
-            String[] values = {working ? "" : mode, Ui.tr("Preview"), "", "", "", "", "", "", ""};
+                    Ui.tr("Remote Buttons"), Ui.tr("Sleep Timer"), Ui.tr("Updates"), Ui.tr("Google notifications"),
+                    Ui.tr("TV Settings")};
+            String[] values = {working ? "" : mode, Ui.tr("Preview"), "", "", "", "", "", "", updatesValue(), alertsValue(), ""};
             for (int i = 0; i < labels.length; i++) {
                 float y = (MAIN_TOP + i * (ROW_H + MAIN_GAP)) * k;
                 rowRect.set(LIST_X * k, y, LIST_R * k, y + ROW_H * k);
@@ -616,6 +618,24 @@ public class SettingsActivity extends Activity {
                 if (off) {
                     rowValue.setColor(blend(0x59FFFFFF, 0x591C1C1E, f));
                     c.drawText(Ui.tr("Unavailable"), right, base, rowValue);
+                } else if (i == MAIN_UPDATES || i == MAIN_ALERTS) {   // their value in place, no chevron (design A3)
+                    rowValue.setColor(blend(0xB3FFFFFF, 0xB31C1C1E, f));
+                    float vx = right;
+                    if (i == MAIN_ALERTS && GoogleAlerts.supported(getContext())) {   // the switch: orange knob right when on
+                        float tw = 64 * k, th = 36 * k, cy = rowRect.centerY();
+                        tmp.set(right - tw, cy - th / 2, right, cy + th / 2);
+                        white.setColor(alertsOn ? blend(0x4DFFB27A, 0xFF1A1614, f) : blend(0x26F3EDE2, 0x261C1C1E, f));
+                        c.drawRoundRect(tmp, th / 2, th / 2, white);
+                        white.setColor(alertsOn ? 0xFFFFB27A : blend(0xFFF3EDE2, 0xFF8C8A86, f));
+                        c.drawCircle(alertsOn ? tmp.right - th / 2 : tmp.left + th / 2, cy, 14 * k, white);
+                        vx = tmp.left - 14 * k;
+                    }
+                    String shown = TextUtils.ellipsize(values[i], new TextPaint(rowValue), 470 * k, TextUtils.TruncateAt.END).toString();
+                    c.drawText(shown, vx, base, rowValue);   // right-aligned paint
+                    if (i == MAIN_UPDATES && updateReady) {   // an update is ready: the orange dot before its value
+                        white.setColor(0xFFFFB27A);
+                        c.drawCircle(vx - rowValue.measureText(shown) - 18 * k, rowRect.centerY(), 5 * k, white);
+                    }
                 } else if (i >= 2) {
                     float cw = Symbols.width(getContext(), "chevron_right", 22 * k);
                     Symbols.draw(getContext(), c, "chevron_right", right - cw / 2, rowRect.centerY(), 22 * k, blend(0x66FFFFFF, 0x991C1C1E, f));
@@ -1030,26 +1050,28 @@ public class SettingsActivity extends Activity {
             if (dollar()) l.add(Ui.tr("Dollar"));
             l.add(Ui.tr("TMDB key"));
             l.add(Ui.tr("Watchmode key"));
-            l.add(Ui.tr("Updates"));
-            l.add(Ui.tr("Google notifications"));
             return l.toArray(new String[0]);
         }
 
-        /** The Updates row: after the coins and the keys, before Google notifications (the last one). */
+        /** Updates and Google notifications are main-screen rows (MAIN_UPDATES, MAIN_ALERTS): none here. */
+        /** The main screen's Updates and Google notifications rows (design A3), before TV Settings. */
+        private static final int MAIN_UPDATES = 8, MAIN_ALERTS = 9;
+
         private int updatesRow() {
-            return settingLabels().length - 2;
+            return -1;
         }
 
         private int alertsRow() {
-            return settingLabels().length - 1;
+            return -1;
         }
 
+        /** The TMDB and Watchmode keys: Home Settings' last two rows. */
         private int keyRow() {
-            return updatesRow() - 2;
+            return settingLabels().length - 2;
         }
 
         private int watchmodeRow() {
-            return updatesRow() - 1;
+            return settingLabels().length - 1;
         }
 
         /** A key's row: "Not set", or the key's last 4 characters (all that's ever shown of it). */
@@ -1154,11 +1176,9 @@ public class SettingsActivity extends Activity {
             if (HOME_ROW >= 0) v[HOME_ROW] = onOff(HomeAssistant.on(getContext()));
             v[QUOTES_ROW] = onOff(Prefs.quotes());
             // No quotes widget, nowhere to show prices: the coins read as off (and stay locked) until it is back on.
-            for (int i = COIN_ROWS; i < v.length - 4; i++) v[i] = onOff(Prefs.quotes() && Prefs.coin(i - COIN_ROWS));
-            v[v.length - 4] = keyValue(Recs.key());
-            v[v.length - 3] = keyValue(Recs.watchmodeKey());
-            v[v.length - 2] = updatesValue();
-            v[v.length - 1] = alertsValue();
+            for (int i = COIN_ROWS; i < v.length - 2; i++) v[i] = onOff(Prefs.quotes() && Prefs.coin(i - COIN_ROWS));
+            v[v.length - 2] = keyValue(Recs.key());
+            v[v.length - 1] = keyValue(Recs.watchmodeKey());
             return v;
         }
 
@@ -2423,6 +2443,9 @@ public class SettingsActivity extends Activity {
                     : screen == HOME_SETTINGS && from + focus == POWER_ON_ROW && unavailable(focus) == null
                     ? Ui.tr("Only after a full start, not from standby.")
                     : screen == HOME_SETTINGS && (from + focus == keyRow() || from + focus == watchmodeRow()) ? Ui.tr("OK: send it from your phone, or type it.")
+                    : screen == MAIN && focus == MAIN_UPDATES ? (updateReady
+                    ? Ui.tr("OK shows what's new. Nothing installs until you choose Install.") : Ui.tr("OK checks for a new version."))
+                    : screen == MAIN && focus == MAIN_ALERTS ? Ui.tr("Notifications from Google apps, in the Control Center.")
                     : screen == HOME_SETTINGS && from + focus == updatesRow() ? (updateReady
                     ? Ui.tr("OK shows what's new. Nothing installs until you choose Install.") : Ui.tr("OK checks for a new version."))
                     : screen == HOME_SETTINGS && from + focus == alertsRow() ? Ui.tr("Notifications from Google apps, in the Control Center.")
@@ -2578,6 +2601,12 @@ public class SettingsActivity extends Activity {
                 pickScroll = 0;
                 screen = POWER;
                 focus = 0;
+            } else if (focus == MAIN_UPDATES) {
+                updateNow();
+                return;
+            } else if (focus == MAIN_ALERTS) {
+                alertsNow();
+                return;
             } else {
                 // As the drawer's TV Settings: where nothing answers the standard request (an HY300 Pro+ in VYRO
                 // mode, #379), Android TV's own settings, and never a crash.
