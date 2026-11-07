@@ -415,6 +415,7 @@ final class Recs {
     private final java.util.concurrent.atomic.AtomicBoolean netflixRunning = new java.util.concurrent.atomic.AtomicBoolean();
     private volatile List<Pick> netflixPool;   // null: not read from the cache yet
     private volatile long netflixTriedAt;
+    private volatile boolean netflixTopRead;   // the last fetch read the Top 10 (else it's tried again in 30 minutes)
 
     /** Netflix's pool: from the cache first, then fetched again every 12 hours (Netflix installed and a TMDB key). */
     void refreshNetflix(Runnable done) {
@@ -431,7 +432,7 @@ final class Recs {
                     if (!netflixPool.isEmpty()) post(done);
                 }
                 long now = System.currentTimeMillis();
-                if (now - cache.getLong("nf:at", 0) < NETFLIX_EVERY && !netflixPool.isEmpty()) return;
+                if (now - cache.getLong("nf:at2", 0) < NETFLIX_EVERY && !netflixPool.isEmpty()) return;
                 if (now - netflixTriedAt < NETFLIX_RETRY) return;
                 netflixTriedAt = now;
                 List<Pick> made = fetchNetflix(pkg);
@@ -442,8 +443,8 @@ final class Recs {
                     a.put(new JSONObject().put("id", p.id).put("kind", p.kind).put("title", p.title).put("backdrop", p.backdrop)
                             .put("new", p.label == ArrivalsLogic.NEW_ON).put("top10", p.top10));
                 }
-                cache.edit().putString("nf:pool", a.toString()).putLong("nf:at", now).apply();
-                AppLog.w("netflix: pool of " + made.size());
+                cache.edit().putString("nf:pool", a.toString()).putLong("nf:at2", netflixTopRead ? now : 0).apply();
+                AppLog.w("netflix: pool of " + made.size() + (netflixTopRead ? "" : " (no Top 10 yet)"));
                 post(done);
             } catch (Exception e) {
                 AppLog.w("netflix: " + e.getMessage());
@@ -485,10 +486,12 @@ final class Recs {
     /** The Top 10 (found on TMDB by name) and the newest titles on Netflix here, pooled by NetflixLogic. */
     private List<Pick> fetchNetflix(String pkg) throws Exception {
         List<NetflixLogic.Title> top = new ArrayList<>();
+        netflixTopRead = false;
         try {
             String tsv = httpText(NETFLIX_TOP10);
             top = NetflixLogic.top10(tsv, REGION);
             if (top.isEmpty()) top = NetflixLogic.top10(tsv, "ZZ");   // a country Netflix doesn't rank: the global list
+            netflixTopRead = !top.isEmpty();
         } catch (IOException e) {
             AppLog.w("netflix top 10: " + e.getMessage());
         }
