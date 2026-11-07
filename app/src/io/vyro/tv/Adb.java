@@ -67,6 +67,21 @@ final class Adb implements Closeable {
         out = socket.getOutputStream();
     }
 
+    private static final long ASK_EVERY_MS = 10 * 60_000L;
+
+    /** True when no background connection has shown "Allow USB debugging?" in the last 10 minutes (and notes this one). */
+    private static synchronized boolean mayAsk(Context c) {
+        java.io.File f = new java.io.File(c.getFilesDir(), "adb-asked");
+        long now = System.currentTimeMillis();
+        if (f.exists() && now - f.lastModified() < ASK_EVERY_MS && f.lastModified() <= now) return false;
+        try {
+            new java.io.FileOutputStream(f).close();
+            f.setLastModified(now);
+        } catch (IOException ignored) {
+        }
+        return true;
+    }
+
     /** Connects and authenticates. If the TV doesn't know our key yet, waits up to `approvalMs` for you to accept. */
     static Adb connect(Context c, int approvalMs, Approval approval) throws IOException {
         KeyPair keys = keys(c);
@@ -105,7 +120,10 @@ final class Adb implements Closeable {
                     adb.send(AUTH, AUTH_SIGNATURE, 0, sign(keys.getPrivate(), m.data));
                     signed = true;
                 } else if (!offeredKey) {
-                    // Unknown key: send the public one; the TV shows "Allow USB debugging?".
+                    // Unknown key: send the public one; the TV shows "Allow USB debugging?". Background work (no
+                    // `approval`) asks at most once in 10 minutes across all of VYRO's processes, so the question
+                    // doesn't come back again and again; what you start yourself (a switch) always asks.
+                    if (approval == null && !mayAsk(c)) throw new IOException(Ui.tr("debugging permission wasn't accepted on the TV"));
                     adb.send(AUTH, AUTH_RSAPUBLICKEY, 0, publicKeyBlob(keys.getPublic()));
                     offeredKey = true;
                     if (approval != null) approval.waiting();
