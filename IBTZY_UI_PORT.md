@@ -232,3 +232,4 @@ serial worker; "Picks from" lookups are memoised per settings change (`Recs.hidd
 - 1.0.3 released (keyless): BuildKeys keeps built-in API keys on the TV (prefs "build-keys") so keyless updates keep them. TV runs personal 1.0.2 with keys (code 12) to test the in-app update to 1.0.3.
 - 1.0.4 released: Adb.mayAsk — background ADB connections offer the key (TV prompt) at most once per 10 min across processes.
 - 1.0.5 released: Games rows IGDB first (GamesLogic.igdbQuery/igdbImage/igdbDate/igdbPlatforms + tests), RAWG fallback; Updates + Google notifications moved to Settings MAIN rows 8-9 (design A3). TV (personal keyed 1.0.4): IGDB games verified (upcoming hero GTA VI), Settings rows verified; Home Screen = VYRO.
+- 1.0.6 released: Settings main — comparison + notices drawn in the left column (no clipping with 11 rows). TV runs release 1.0.5 (keys kept via BuildKeys: recs on); 1.0.6 to come via the update sheet.

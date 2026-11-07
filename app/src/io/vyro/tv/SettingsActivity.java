@@ -675,9 +675,14 @@ public class SettingsActivity extends Activity {
                 c.restore();
                 y += errorLayout.getLineBaseline(errorLayout.getLineCount() - 1) - errorLayout.getLineBaseline(0) + 46 * k;
             }
-            y = drawComparison(c, y);
-            y = drawRecs(c, y + 26 * k);
-            drawNotices(c, y + 40 * k);
+            drawRecs(c, y + 26 * k);
+            // The comparison and the notices in the left column, under the name: with Updates and Google
+            // notifications on the main list (design A3), under the list they would run off the screen.
+            c.save();
+            c.translate(140 * k - 30 * k - LIST_X * k, 0);
+            float ly = drawComparison(c, 660 * k);
+            drawNotices(c, ly + 40 * k);
+            c.restore();
         }
 
         /** Home screen picks: status, and the credit TMDB asks for. */
