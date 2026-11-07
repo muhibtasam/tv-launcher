@@ -1,7 +1,7 @@
-import io.freemytv.AppsLogic;
-import io.freemytv.ContinueLogic;
-import io.freemytv.GamesV1Logic;
-import io.freemytv.Tr;
+import io.vyro.tv.AppsLogic;
+import io.vyro.tv.ContinueLogic;
+import io.vyro.tv.GamesV1Logic;
+import io.vyro.tv.Tr;
 import java.util.Locale;
 import java.util.TimeZone;
 

@@ -1,5 +1,5 @@
-import io.freemytv.AlertsLogic;
-import io.freemytv.AlertsLogic.Alert;
+import io.vyro.tv.AlertsLogic;
+import io.vyro.tv.AlertsLogic.Alert;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -26,7 +26,7 @@ public class AlertsLogicTest {
         check("Play Store kept", AlertsLogic.keep(PLAY, false, false, false, null, false, "3 apps updated", ""));
         check("Google TV kept", AlertsLogic.keep("com.google.android.apps.tv.launcherx", false, false, false, null, false, "Tip", ""));
         check("Netflix dropped", !AlertsLogic.keep("com.netflix.ninja", false, false, false, null, false, "New episode", ""));
-        check("this launcher dropped", !AlertsLogic.keep("io.freemytv", false, false, false, null, false, "x", ""));
+        check("this launcher dropped", !AlertsLogic.keep("io.vyro.tv", false, false, false, null, false, "x", ""));
         check("a look-alike name dropped", !AlertsLogic.keep("com.google.android.youtube.tv.fake", false, false, false, null, false, "x", ""));
         check("null package dropped", !AlertsLogic.keep(null, false, false, false, null, false, "x", ""));
         // Not alerts: ongoing, foreground services, group summaries, media, progress, empty.

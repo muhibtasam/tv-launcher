@@ -1,8 +1,8 @@
-import io.freemytv.ArrivalsLogic;
-import io.freemytv.ArrivalsLogic.Release;
-import io.freemytv.ArrivalsLogic.Result;
-import io.freemytv.ArrivalsLogic.Snapshot;
-import io.freemytv.ArrivalsLogic.State;
+import io.vyro.tv.ArrivalsLogic;
+import io.vyro.tv.ArrivalsLogic.Release;
+import io.vyro.tv.ArrivalsLogic.Result;
+import io.vyro.tv.ArrivalsLogic.Snapshot;
+import io.vyro.tv.ArrivalsLogic.State;
 
 import java.util.ArrayList;
 import java.util.Arrays;

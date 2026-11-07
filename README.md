@@ -2,32 +2,32 @@
 
 <img src="docs/assets/icon-512.png" width="96" alt="">
 
-# Free My TV
+# VYRO
 
 **A fast, ad-free home screen for Google TV, LG and Samsung TVs.**
 
 Trending picks from your own apps, the weather at a glance, and a look that follows the sunset.<br>
 Open source. Built with Claude Code. One button to undo.
 
-[**freemytv.io**](https://freemytv.io) · [Install](#install) · [LG TVs](#lg-tvs-webos) · [Samsung TVs](#samsung-tvs-tizen) · [Any TV](#any-tv) · [Make it yours](#make-it-yours)
+[**Download**](https://github.com/muhibtasam/vyro/releases/latest) · [Install](#install) · [LG TVs](#lg-tvs-webos) · [Samsung TVs](#samsung-tvs-tizen) · [Any TV](#any-tv) · [Make it yours](#make-it-yours)
 
-<img src=".github/preview.webp" width="880" alt="The Free My TV home screen: a glass shelf of apps, trending picks, and a drawer with the weather and crypto prices">
+<img src=".github/preview.webp" width="880" alt="The VYRO home screen: a glass shelf of apps, trending picks, and a drawer with the weather and crypto prices">
 
 </div>
 
-> **TV launcher (working name)** — this repository is a fork of [Free My TV](https://github.com/simbasjungles/free-my-tv)
+> **VYRO** — a premium, futuristic home screen for Google TV and Android TV. VYRO is a fork of [Free My TV](https://github.com/simbasjungles/free-my-tv)
 > with the look of ibtzy TV Launcher on Google TV and Android TV: ibtzy's home screen, tabs (Home, Movies, Apps;
 > Games off until turned on in *Settings* → *Tabs*), Control Center, screensaver and settings, over Free My TV's mode
 > switch, watchdog and one-button undo. What it adds on Google TV and Android TV:
 >
-> - **Updates that always ask.** A daily check of [this repository's releases](https://github.com/muhibtasam/tv-launcher/releases/latest);
+> - **Updates that always ask.** A daily check of [this repository's releases](https://github.com/muhibtasam/vyro/releases/latest);
 >   when one is ready, a sheet shows the version, its size and date and what's new, with *Install* and *Later*. Nothing
 >   installs by itself, and Android's installer asks again.
 > - **Google notifications** in the Control Center, with an orange dot on its button while some are unread
 >   (*Home Settings* → *Google notifications*).
 > - **Continue Watching** you can tidy: hold OK on a card to remove it; it comes back after you watch it again.
 >
-> LG and Samsung builds are Free My TV's, unchanged. The name will change later.
+> The LG and Samsung builds come from Free My TV and keep its look.
 
 ## What you get
 
@@ -42,10 +42,10 @@ Open source. Built with Claude Code. One button to undo.
 - **The status at a glance, and a mouse** (Google TV and Android TV). *Home Settings* → *Status icons* puts Wi-Fi or Ethernet, Bluetooth audio and a USB drive at the top of the home screen; off, nothing listens for them. A mouse or an air-mouse remote works too: hover moves the focus, the wheel scrolls, a click picks.
 - **Light by day, dark by night.** It follows your city's real sunset, the way your phone does.
 - **A screensaver to match.** Full-screen photos of the picks with a big glass clock. On LG and Samsung, *Home Settings* → *Screensaver* can make it a large clock with the weather instead, drifting slowly so it doesn't burn into OLED screens. Optionally (*Watch from the screensaver*, in Home Settings), OK opens the title on screen in its app, and any other button just closes it.
-- **Dimming for a dark room** (LG and Samsung). *Home Settings* → *Dim* darkens Free My TV's own screens, not the apps you open: low, medium, high, or automatic (medium from 22:00 to 07:00). Off until you pick it.
+- **Dimming for a dark room** (LG and Samsung). *Home Settings* → *Dim* darkens VYRO's own screens, not the apps you open: low, medium, high, or automatic (medium from 22:00 to 07:00). Off until you pick it.
 - **Your own photos** (Google TV and Android TV). Send them from your computer (up to 100): the screensaver shows them, and without picks one is the home screen's background each hour.
 - **Fast.** 60 fps, every frame in 16.6 ms, on the TV's own chip. The home screen uses 96 MB of memory instead of 242 MB (−60%).<br><sub>Measured on a 98″ TCL Google TV running Android 14.</sub>
-- **Set up on the TV.** Language, your city, temperature, theme, how many picks and which streaming services they come from, the weather and prices cards, the forecast's hours or days, which coins, and the apps on the shelf, in Free My TV's own settings.
+- **Set up on the TV.** Language, your city, temperature, theme, how many picks and which streaming services they come from, the weather and prices cards, the forecast's hours or days, which coins, and the apps on the shelf, in VYRO's own settings.
 - **Safe.** No root. Nothing is uninstalled. One button brings back the factory home screen.
 
 ## Install
@@ -56,30 +56,30 @@ About ten minutes. You need a Google TV or Android TV (Android 8 or newer) and a
 
 1. **On the TV**, turn on developer mode: Settings → System → About → press *Android TV OS build* 7 times. Then Settings → System → Developer options → turn on **USB debugging**. Write down the TV's IP address (Settings → Network & Internet).
 2. **On your computer**, open an AI coding assistant ([Claude Code](https://claude.com/claude-code), Codex or Antigravity) and say:
-   > Install Free My TV (github.com/simbasjungles/free-my-tv) on my TV at 192.168.1.50. I live in Lisbon.
+   > Install VYRO (github.com/simbasjungles/free-my-tv) on my TV at 192.168.1.50. I live in Lisbon.
 
    It downloads the code, installs the tools it needs, builds the app and puts it on your TV, and asks before anything important. Swap in your TV's IP and your city.
-3. **On the TV**, open *Free My TV* → *Home Screen* → *Free My TV*. That's when the TV asks *Allow USB debugging?* for Free My TV: tick *Always allow* and accept.
+3. **On the TV**, open *VYRO* → *Home Screen* → *VYRO*. That's when the TV asks *Allow USB debugging?* for VYRO: tick *Always allow* and accept.
 
 ### The ready APK
 
-No tools to install besides adb. The APK on the [latest release](https://github.com/muhibtasam/tv-launcher/releases/latest) has no TMDB key: add yours on the TV for the picks (*Home Settings* → *TMDB key*, [below](#the-tmdb-key)). It takes your city from the TV's time zone (change it in *Home Settings* → *City*).
+No tools to install besides adb. The APK on the [latest release](https://github.com/muhibtasam/vyro/releases/latest) has no TMDB key: add yours on the TV for the picks (*Home Settings* → *TMDB key*, [below](#the-tmdb-key)). It takes your city from the TV's time zone (change it in *Home Settings* → *City*).
 
-If you built Free My TV yourself before, switch back to *Original* and uninstall it first: your build and the release are signed with different keys.
+If you built VYRO yourself before, switch back to *Original* and uninstall it first: your build and the release are signed with different keys.
 
 1. **On the TV**, do step 1 above.
-2. **On your computer**, download `FreeMyTV.apk` from the release and install it:
+2. **On your computer**, download `VYRO.apk` from the release and install it:
    ```bash
    adb connect 192.168.1.50:5555
-   adb install -r FreeMyTV.apk
+   adb install -r VYRO.apk
    ```
    On Android 14, Google Play Protect may hold the install with *Risky app blocked*: choose *More details* → *Install anyway*.
 
-   Install it with adb like this, not by opening the APK on the TV: from a file manager or a browser, Play Protect can refuse it outright with *App blocked to protect your device* (in some countries it blocks sideloaded apps that have an accessibility service or a notification listener, which Free My TV uses for the remote's buttons and Now Playing; #378).
+   Install it with adb like this, not by opening the APK on the TV: from a file manager or a browser, Play Protect can refuse it outright with *App blocked to protect your device* (in some countries it blocks sideloaded apps that have an accessibility service or a notification listener, which VYRO uses for the remote's buttons and Now Playing; #378).
 
    On TCL TVs, also let it run in the background (TCL blocks it by default, and the switch never starts). An uninstall takes the permission back, so run it again after every new install:
    ```bash
-   adb shell "appops set io.freemytv AUTO_START allow || appops set io.freemytv APP_AUTO_START allow"
+   adb shell "appops set io.vyro.tv AUTO_START allow || appops set io.vyro.tv APP_AUTO_START allow"
    ```
 3. **On the TV**, do step 3 above.
 
@@ -104,50 +104,50 @@ For the picks, add your TMDB key in *Home Settings* → *TMDB key* (below).
 4. **Install:**
    ```bash
    adb connect 192.168.1.50:5555
-   adb install -r FreeMyTV.apk
+   adb install -r VYRO.apk
    ```
-   If the install seems stuck, look at the TV: on Android 14, Google Play Protect may hold it with *Risky app blocked* ("built for an older version of Android"), since Free My TV targets Android 13. Choose *More details* → *Install anyway*. Updates don't ask again.
+   If the install seems stuck, look at the TV: on Android 14, Google Play Protect may hold it with *Risky app blocked* ("built for an older version of Android"), since VYRO targets Android 13. Choose *More details* → *Install anyway*. Updates don't ask again.
 
    Chromecast with Google TV on Android 14 keeps port 5555 closed even with USB debugging on: turn on *Wireless debugging* (Developer options), pair with `adb pair <address:port> <code>`, then run `adb tcpip 5555` over that connection. Port 5555 closes again at every restart, so after one, *Original*, the watchdog and the boot check can't reach ADB until you run `adb tcpip 5555` again (the pairing stays).
 
    On TCL TVs, also let it run in the background (TCL blocks it by default, and the switch never starts). An uninstall takes the permission back, so run it again after every new install:
    ```bash
-   adb shell "appops set io.freemytv AUTO_START allow || appops set io.freemytv APP_AUTO_START allow"
+   adb shell "appops set io.vyro.tv AUTO_START allow || appops set io.vyro.tv APP_AUTO_START allow"
    ```
-5. **On the TV**, open *Free My TV* → *Home Screen* → *Free My TV*. The TV asks *Allow USB debugging?* once more, now for Free My TV itself: tick *Always allow* and accept. (Run `adb disconnect 192.168.1.50:5555` first: on Android 8 to 10 the TV can hand that answer to a computer that's still connected.)
+5. **On the TV**, open *VYRO* → *Home Screen* → *VYRO*. The TV asks *Allow USB debugging?* once more, now for VYRO itself: tick *Always allow* and accept. (Run `adb disconnect 192.168.1.50:5555` first: on Android 8 to 10 the TV can hand that answer to a computer that's still connected.)
 
-   On some TCL TVs (Android 11, Realtek), a second background killer, TGuard, can stop the switch while it measures the original home screen: the settings screen closes and the TV's own home screen stays. Android runs the switch again by itself within a minute or two; then press Home: Free My TV opening means it went through.
+   On some TCL TVs (Android 11, Realtek), a second background killer, TGuard, can stop the switch while it measures the original home screen: the settings screen closes and the TV's own home screen stays. Android runs the switch again by itself within a minute or two; then press Home: VYRO opening means it went through.
 
 ## LG TVs (webOS)
 
-The same home screen as an LG app: the picks, the glass shelf with your apps, the drawer with inputs, weather and prices, day and night, Home Settings and the shelf editor. It installs through LG's own Developer Mode, with nothing rooted or changed on the TV. LG's home screen stays where it is, and Free My TV is one press of a number key away (or in LG's app list, on remotes without them).
+The same home screen as an LG app: the picks, the glass shelf with your apps, the drawer with inputs, weather and prices, day and night, Home Settings and the shelf editor. It installs through LG's own Developer Mode, with nothing rooted or changed on the TV. LG's home screen stays where it is, and VYRO is one press of a number key away (or in LG's app list, on remotes without them).
 
 You need an LG TV (webOS 3 or newer) and a computer on the same Wi-Fi, with Python 3.
 
 1. **On the TV**, open the LG Content Store and install **Developer Mode**. Sign in with a free [LG developer account](https://webostv.developer.lge.com), turn on **Dev Mode Status** (the TV restarts), then turn on **Key Server**. Write down the IP address and the passphrase it shows.
 2. **On your computer**, get the code and build. `config.properties` works as for Google TV (your city, your [TMDB key](#the-tmdb-key)):
    ```bash
-   git clone https://github.com/simbasjungles/free-my-tv && cd free-my-tv
+   git clone https://github.com/simbasjungles/free-my-tv && cd vyro
    python3 webos/build.py
    ```
 3. **Install.** The first time, it asks for the TV's passphrase; updates don't. On a TV that isn't 4K, it puts the app in at 1280 × 720, the size those TVs draw apps at:
    ```bash
    python3 webos/install.py 192.168.1.50
    ```
-4. **On the TV**, while Free My TV is open, hold a number key on the remote. From then on, that key opens it from anywhere. On a remote without number keys, open it from LG's app list on the home screen, like any other app.
+4. **On the TV**, while VYRO is open, hold a number key on the remote. From then on, that key opens it from anywhere. On a remote without number keys, open it from LG's app list on the home screen, like any other app.
 
-With an AI assistant, say *"Install Free My TV (github.com/simbasjungles/free-my-tv) on my LG TV at 192.168.1.50. I live in Lisbon."* It builds the app and hands you the install command, so you type the passphrase yourself.
+With an AI assistant, say *"Install VYRO (github.com/simbasjungles/free-my-tv) on my LG TV at 192.168.1.50. I live in Lisbon."* It builds the app and hands you the install command, so you type the passphrase yourself.
 
-With the [webOS Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel), you can skip the computer: add the repository `https://freemytv.io/webos/apps.json` in the Channel's settings, and Free My TV shows up in its list. That's the release build: it takes the city from the TV's time zone (change it in *Home Settings* → *City*), and for the picks you type your [TMDB key](#the-tmdb-key) in *Home Settings* → *TMDB key*. If you installed your own build, don't update it from there, or the release replaces it. On some LG TVs that aren't 4K, that build fills only the top-left part of the screen: `install.py` puts it in at the right size there.
+With the [webOS Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel), you can skip the computer: add the repository `https://freemytv.io/webos/apps.json` in the Channel's settings, and VYRO shows up in its list. That's the release build: it takes the city from the TV's time zone (change it in *Home Settings* → *City*), and for the picks you type your [TMDB key](#the-tmdb-key) in *Home Settings* → *TMDB key*. If you installed your own build, don't update it from there, or the release replaces it. On some LG TVs that aren't 4K, that build fills only the top-left part of the screen: `install.py` puts it in at the right size there.
 
-On webOS 6 and newer, LG doesn't let apps installed through Developer Mode see which apps the TV has. Free My TV then shows the well-known ones it finds (Netflix, YouTube, Prime Video, Disney+, Apple TV, Plex and more) and asks the TV, once, for the access LG's phone app uses: a message on the TV asks whether to allow Free My TV. Allow it, and from the next start all your apps show, with their icons.
+On webOS 6 and newer, LG doesn't let apps installed through Developer Mode see which apps the TV has. VYRO then shows the well-known ones it finds (Netflix, YouTube, Prime Video, Disney+, Apple TV, Plex and more) and asks the TV, once, for the access LG's phone app uses: a message on the TV asks whether to allow VYRO. Allow it, and from the next start all your apps show, with their icons.
 
-Older LG TVs (webOS 3) don't let Free My TV see their apps at all, so the shelf stays empty. There your computer asks the TV instead (the TV asks once whether to allow it), and the list and icons are built into the app. Run it again after installing new apps on the TV:
+Older LG TVs (webOS 3) don't let VYRO see their apps at all, so the shelf stays empty. There your computer asks the TV instead (the TV asks once whether to allow it), and the list and icons are built into the app. Run it again after installing new apps on the TV:
 ```bash
 python3 webos/apps.py 192.168.1.50 && python3 webos/build.py && python3 webos/install.py 192.168.1.50
 ```
 
-Developer Mode lasts about 40 days: open the Developer Mode app now and then and press **EXTEND**, or let your computer do it with `python3 webos/renew.py 192.168.1.50` (it needs the TV on and reachable, and the key `install.py` already saved). Run that on a schedule and you never touch EXTEND again — weekly is plenty; `webos/renew.py` shows a cron line for macOS and Linux and a Task Scheduler one for Windows. To remove Free My TV, run `python3 webos/install.py 192.168.1.50 --uninstall`.
+Developer Mode lasts about 40 days: open the Developer Mode app now and then and press **EXTEND**, or let your computer do it with `python3 webos/renew.py 192.168.1.50` (it needs the TV on and reachable, and the key `install.py` already saved). Run that on a schedule and you never touch EXTEND again — weekly is plenty; `webos/renew.py` shows a cron line for macOS and Linux and a Task Scheduler one for Windows. To remove VYRO, run `python3 webos/install.py 192.168.1.50 --uninstall`.
 
 ## Samsung TVs (Tizen)
 
@@ -158,13 +158,13 @@ You need a Samsung TV on Tizen, from 2015 or newer, and a computer on the same W
 1. **On the TV**, open **Apps** and type `1 2 3 4 5` on the remote. Turn **Developer mode** on, type your computer's IP address in **Host PC IP**, and restart the TV.
 2. **On your computer**, download [TizenBrew Installer](https://github.com/reisxd/TizenBrewInstaller/releases/latest), the community's installer for Samsung TVs, open it and connect to your TV.
 3. **Install from GitHub:** type `simbasjungles/free-my-tv`. On 2023 and newer TVs it asks you to sign in to your Samsung account once, to sign the app for your TV.
-4. **Straight to it:** in the TV's settings, under Start Screen Options, turn on **Autorun Last App**: the TV turns on into Free My TV (tested on a 2017 TV; 2019 and 2020 TVs don't reopen it, #356). There, move Free My TV to the first place in the Home bar, so it's one press away.
+4. **Straight to it:** in the TV's settings, under Start Screen Options, turn on **Autorun Last App**: the TV turns on into VYRO (tested on a 2017 TV; 2019 and 2020 TVs don't reopen it, #356). There, move VYRO to the first place in the Home bar, so it's one press away.
 
-This build takes your city from the TV's time zone (change it in *Home Settings* → *City*), and for the trending picks you type your [TMDB key](#the-tmdb-key) in *Home Settings* → *TMDB key*. To build it with your own `config.properties` instead, open the folder in Claude Code and say *"Install Free My TV on my Samsung TV at 192.168.1.50. I live in Lisbon."* It sets up Samsung's tools, and on 2023 and newer TVs you sign in to your Samsung account in the browser to make the certificate. Your signed build installs with `python3 tizen/install.py 192.168.1.50`, which needs only Python: no Tizen Studio, and no Rosetta on Apple Silicon Macs.
+This build takes your city from the TV's time zone (change it in *Home Settings* → *City*), and for the trending picks you type your [TMDB key](#the-tmdb-key) in *Home Settings* → *TMDB key*. To build it with your own `config.properties` instead, open the folder in Claude Code and say *"Install VYRO on my Samsung TV at 192.168.1.50. I live in Lisbon."* It sets up Samsung's tools, and on 2023 and newer TVs you sign in to your Samsung account in the browser to make the certificate. Your signed build installs with `python3 tizen/install.py 192.168.1.50`, which needs only Python: no Tizen Studio, and no Rosetta on Apple Silicon Macs.
 
 ## Settings
 
-The first values come from `config.properties`, created by the first build (Google TV, LG and Samsung use the same file). Most of them can also be changed on the TV, in *Free My TV* → *Home Settings*, and the TV's choice wins:
+The first values come from `config.properties`, created by the first build (Google TV, LG and Samsung use the same file). Most of them can also be changed on the TV, in *VYRO* → *Home Settings*, and the TV's choice wins:
 
 | Key | What it does | Default |
 |---|---|---|
@@ -185,7 +185,7 @@ The first values come from `config.properties`, created by the first build (Goog
 | `temperature` | `C`, `F` or `auto` | `auto` |
 | `theme` | `auto` (dark from sunset to sunrise), `light` or `dark` | `auto` |
 | `disable_assistant` | Also turn off Google Assistant | `false` |
-| `screensaver` | `false` keeps the TV's own screensaver: Free My TV then changes only the home screen and the promo apps (Google TV) | `true` |
+| `screensaver` | `false` keeps the TV's own screensaver: VYRO then changes only the home screen and the promo apps (Google TV) | `true` |
 | `hide_services` | Streaming services to leave out of the picks even when their app is on the TV (`netflix`, `prime`, `disney`…), comma separated; for apps the TV ships that you don't subscribe to. On Google TV and Android TV, a service that TMDB lists in your country under the same name as an app on the TV also appears in *Picks from*, off until you switch it on. It is where the switches in Home Settings › Picks › Picks from start; what you switch on the TV wins. Google TV only | empty |
 | `hide_apps` | Apps to leave out of the shelf, All Apps and the picks, by id or name (part of it), comma separated; for apps the TV ships that can't be uninstalled, like Samsung's built-in Netflix. LG and Samsung only | empty |
 | `shelf_apps` | The shelf's apps in this order, by id or name (part of it), comma separated; changing it wins once over the shelf picked on the TV. On Samsung, a whole app id also brings an app the TV leaves out of its list, like one installed in Developer Mode. LG and Samsung only | empty |
@@ -239,7 +239,7 @@ On Google TV and Android TV, with the TV connected over adb (see *Install*), sen
 python3 tools/photos.py <TV IP> beach.jpg hills.jpg Holidays/
 ```
 
-They land in the app's own folder on the TV (no permission needed); on Android 11, which keeps adb out of other apps' folders, they go through Free My TV itself. The next time the home screen, the screensaver or Free My TV's settings open, the app imports each one: turned upright, kept whole (never cropped) at the TV's size and saved without its GPS and other tags; what was sent is then deleted. The screensaver shows them in the order you sent them, instead of the picks' photos: most fill the screen with a slow zoom, as the picks' do (a 3:2 or 4:3 photo loses a little of its height), and those that would lose more than about 30% of their height or width, like portraits and panoramas, show whole and still, on black; without a TMDB key, one of them is the home screen's background, a new one every hour. *Home Settings* → *My Photos*: the arrows turn them on or off, OK removes them. Up to 100; JPEG, PNG and WebP, and HEIC on Android 9 and newer.
+They land in the app's own folder on the TV (no permission needed); on Android 11, which keeps adb out of other apps' folders, they go through VYRO itself. The next time the home screen, the screensaver or VYRO's settings open, the app imports each one: turned upright, kept whole (never cropped) at the TV's size and saved without its GPS and other tags; what was sent is then deleted. The screensaver shows them in the order you sent them, instead of the picks' photos: most fill the screen with a slow zoom, as the picks' do (a 3:2 or 4:3 photo loses a little of its height), and those that would lose more than about 30% of their height or width, like portraits and panoramas, show whole and still, on black; without a TMDB key, one of them is the home screen's background, a new one every hour. *Home Settings* → *My Photos*: the arrows turn them on or off, OK removes them. Up to 100; JPEG, PNG and WebP, and HEIC on Android 9 and newer.
 
 #### From an Immich server
 
@@ -268,9 +268,9 @@ The TV talks to your server directly on your network. If the server can't be rea
 
 ## Going back
 
-On the TV: *Free My TV* → *Home Screen* → *Original*. The factory home screen, screensaver and every app come back exactly as they were. If the new home screen ever crashes three times in five minutes, it switches back by itself.
+On the TV: *VYRO* → *Home Screen* → *Original*. The factory home screen, screensaver and every app come back exactly as they were. If the new home screen ever crashes three times in five minutes, it switches back by itself.
 
-To remove it for good, switch to *Original* first, then uninstall *Free My TV* (Settings → Apps). Uninstalled it while it was on? Install it again and pick *Original*: the list of what it turned off is kept in the TV's settings, so everything comes back.
+To remove it for good, switch to *Original* first, then uninstall *VYRO* (Settings → Apps). Uninstalled it while it was on? Install it again and pick *Original*: the list of what it turned off is kept in the TV's settings, so everything comes back.
 
 ## What it changes
 
@@ -284,35 +284,35 @@ To remove it for good, switch to *Original* first, then uninstall *Free My TV* (
   - on Multilaser TVs, Anoki's screen-content recognition (ACR), the store demo and the manual;
   - on KTC-made TVs (NextStar), Anoki's screen-content recognition (ACR), the store demo and the manual;
   - Google Assistant, only with `disable_assistant=true`.
-- On Google TV, the Assistant's results for films and shows come from Google TV's home app, which is off in Free My TV mode: asking it to play a show can end in "Sorry, I don't understand", and a search can show only YouTube videos. Opening apps, questions and apps' own voice search (YouTube's, for one) still work; *Original* brings it all back.
-- On TCL TVs, the remote's Netflix, YouTube and Prime buttons keep working through a small accessibility service that only reads those buttons. Pick what each one opens in *Free My TV* → *Remote Buttons*; *Original* turns the service off. The Settings button opens TV Settings; in *Remote Buttons* it can open *Quick Settings* instead, a panel over what's playing (Inputs, Display, Sound, Network, Bluetooth, Accessibility and all settings) in place of Google TV's, which is part of its home screen. On TCL TVs with Android 11 the service stays off, since with it the TV moved the volume two steps per press: there the buttons work on Free My TV's home screen. On Vestel-made TVs (F&U and other store brands) and Xiaomi (Formovie) projectors the same goes for the Netflix button, and on KTC-made TVs (NextStar) for the Tabii button. On Sony TVs, the BRAVIA CORE, Netflix, Disney+, Prime Video, YouTube and Crunchyroll buttons (and Google Play or SonyLIV, on remotes that have them) can each open the app you pick, or keep Sony's default. On Sony's Google TV models, where those buttons went through Google TV's home screen, they open their own apps unless you pick otherwise. On Xiaomi TVs whose remote has a Mi button instead of Home, that button opens Free My TV instead of PatchWall (or, if you pick it, PatchWall as before, or another app). On Xiaomi TVs, the YouTube button opens YouTube again (Google TV's home screen answered it), and the PatchWall button can open the app you pick. On Xiaomi's MiTV-AFKR0, the buttons marked Mi TV+, Netflix, Prime Video and YouTube can each open the app you pick (Mi TV+ keeps PatchWall until you do). On Xiaomi TVs sold in Russia, the same goes for the Okko, VK, Rutube, KION, Wink and IVI buttons, which keep Xiaomi's default until you pick another app. On Hisense TVs, the Prime Video, YouTube, Disney+, All Apps, Settings and profile buttons, which Google TV's home screen answered, open what you pick (All Apps opens Free My TV's own; Netflix stays with the TV). On the Google TV Streamer, the YouTube, Netflix and ★ buttons can each open the app you pick or Free My TV's All Apps: YouTube opens YouTube (Google TV's home screen answered it, and ★ too), and Netflix and ★ keep Google's default until you pick something, so ★ does nothing in Free My TV mode until then. On the JVC G24 (Skyworth), whose Inputs and Settings buttons need Google TV's home screen, Inputs opens the TV's list of inputs and Settings a small Quick Settings panel (Picture, Sound, Inputs, Wi-Fi, Bluetooth and TV Settings). On Philips' Google TV models, the Settings and apps buttons, which Google TV's home screen answered, open TV Settings (or *Quick Settings*) and Free My TV's All Apps, and the Netflix, YouTube, Prime Video and TV Guide buttons keep Philips' default until you pick an app. On any of these TVs, setting every button to *Nothing* (or the brand's default) turns the service off.
+- On Google TV, the Assistant's results for films and shows come from Google TV's home app, which is off in VYRO mode: asking it to play a show can end in "Sorry, I don't understand", and a search can show only YouTube videos. Opening apps, questions and apps' own voice search (YouTube's, for one) still work; *Original* brings it all back.
+- On TCL TVs, the remote's Netflix, YouTube and Prime buttons keep working through a small accessibility service that only reads those buttons. Pick what each one opens in *VYRO* → *Remote Buttons*; *Original* turns the service off. The Settings button opens TV Settings; in *Remote Buttons* it can open *Quick Settings* instead, a panel over what's playing (Inputs, Display, Sound, Network, Bluetooth, Accessibility and all settings) in place of Google TV's, which is part of its home screen. On TCL TVs with Android 11 the service stays off, since with it the TV moved the volume two steps per press: there the buttons work on VYRO's home screen. On Vestel-made TVs (F&U and other store brands) and Xiaomi (Formovie) projectors the same goes for the Netflix button, and on KTC-made TVs (NextStar) for the Tabii button. On Sony TVs, the BRAVIA CORE, Netflix, Disney+, Prime Video, YouTube and Crunchyroll buttons (and Google Play or SonyLIV, on remotes that have them) can each open the app you pick, or keep Sony's default. On Sony's Google TV models, where those buttons went through Google TV's home screen, they open their own apps unless you pick otherwise. On Xiaomi TVs whose remote has a Mi button instead of Home, that button opens VYRO instead of PatchWall (or, if you pick it, PatchWall as before, or another app). On Xiaomi TVs, the YouTube button opens YouTube again (Google TV's home screen answered it), and the PatchWall button can open the app you pick. On Xiaomi's MiTV-AFKR0, the buttons marked Mi TV+, Netflix, Prime Video and YouTube can each open the app you pick (Mi TV+ keeps PatchWall until you do). On Xiaomi TVs sold in Russia, the same goes for the Okko, VK, Rutube, KION, Wink and IVI buttons, which keep Xiaomi's default until you pick another app. On Hisense TVs, the Prime Video, YouTube, Disney+, All Apps, Settings and profile buttons, which Google TV's home screen answered, open what you pick (All Apps opens VYRO's own; Netflix stays with the TV). On the Google TV Streamer, the YouTube, Netflix and ★ buttons can each open the app you pick or VYRO's All Apps: YouTube opens YouTube (Google TV's home screen answered it, and ★ too), and Netflix and ★ keep Google's default until you pick something, so ★ does nothing in VYRO mode until then. On the JVC G24 (Skyworth), whose Inputs and Settings buttons need Google TV's home screen, Inputs opens the TV's list of inputs and Settings a small Quick Settings panel (Picture, Sound, Inputs, Wi-Fi, Bluetooth and TV Settings). On Philips' Google TV models, the Settings and apps buttons, which Google TV's home screen answered, open TV Settings (or *Quick Settings*) and VYRO's All Apps, and the Netflix, YouTube, Prime Video and TV Guide buttons keep Philips' default until you pick an app. On any of these TVs, setting every button to *Nothing* (or the brand's default) turns the service off.
 - With *Home Settings* → *Now Playing widget* on (it starts off), what an app is playing shows in place of the prices while it plays, on the home screen and the screensaver. Android hands that only to a notification listener, so turning the widget on allows ours through the TV's ADB; turning it off, *Original* and the switch back after crashes take it away. Where the TV refuses it, the row says so.
 - On HY300 projectors, whose stock home screen was the only way to them, the bottom drawer gets *Keystone* (keystone, zoom and projection mode) and *Screen Mirroring* (the projector's Miracast receiver), and HDMI opens through the projector's own player.
 - Where *TV Settings* opens the TV maker's own menu instead of Android's (older Philips TVs, whose menu has no Apps), the bottom drawer gets *App Settings*: Android's list of apps, to force-stop one, clear its data or uninstall it.
 - *Home Settings* → *Recent Apps* (off by default, Google TV and Android TV) puts *Recent Apps* in the bottom drawer, and on the remote's app-switch key where it has one; *Drawer and Home twice* also opens it with two quick presses of Home (not on Xiaomi TVs, whose remote sends one press as several), and *Top Buttons* can add it as a round button. It shows the open apps over the blurred home screen: OK opens one, ▲ closes it. Closing stops the app (`am force-stop`), so it starts from scratch next time; the TV's own pieces, what its inputs and remote need, apps whose accessibility service is on, and the keyboard can't be closed. It reads the list only while it's open, with `dumpsys activity recents` and `ps -A` through the TV's ADB.
 - On Google TV, Android TV and Fire TV, hold OK on a top button or shelf app to move it directly on Home: ◀ ▶ changes its position, OK saves, and Back cancels. Leaving Home also cancels an unfinished move. A short press still opens the item; the Shelf and Top Buttons editors in Settings remain available.
-- *Free My TV* → *Top Buttons* → *App Store* (Google TV, Android TV and Fire TV) adds a shopping-bag shortcut to the top of the home screen. It opens Google Play or, on Fire TV, Amazon Appstore. OK adds or removes it; ◀ ▶ moves it next to Live TV or wherever you prefer. It starts off, and is unavailable when neither supported store can be opened.
-- *Home Settings* → *At power-on* (Google TV and Android TV, where the TV has live TV) decides what shows after the TV starts from off; waking from standby is left alone. *TV's choice* (the default) changes nothing. *Home screen* gives the screen back to Free My TV when the TV's live TV app puts itself on top during the start, as some MediaTek TVs do, but only if no key has been pressed since the home screen came up. *Live TV* opens live TV about 10 seconds after the home screen comes up, unless a key was pressed first (on Sony, Sony's TV app, which remembers the last input and channel).
-- *Free My TV* → *Sleep Timer* turns the TV off after 5 minutes to 4 hours, with the minutes left over any app (top center, or the corner you pick). It presses the remote's Sleep key through the TV's own ADB, so it works in Free My TV mode; *Original* stops it.
+- *VYRO* → *Top Buttons* → *App Store* (Google TV, Android TV and Fire TV) adds a shopping-bag shortcut to the top of the home screen. It opens Google Play or, on Fire TV, Amazon Appstore. OK adds or removes it; ◀ ▶ moves it next to Live TV or wherever you prefer. It starts off, and is unavailable when neither supported store can be opened.
+- *Home Settings* → *At power-on* (Google TV and Android TV, where the TV has live TV) decides what shows after the TV starts from off; waking from standby is left alone. *TV's choice* (the default) changes nothing. *Home screen* gives the screen back to VYRO when the TV's live TV app puts itself on top during the start, as some MediaTek TVs do, but only if no key has been pressed since the home screen came up. *Live TV* opens live TV about 10 seconds after the home screen comes up, unless a key was pressed first (on Sony, Sony's TV app, which remembers the last input and channel).
+- *VYRO* → *Sleep Timer* turns the TV off after 5 minutes to 4 hours, with the minutes left over any app (top center, or the corner you pick). It presses the remote's Sleep key through the TV's own ADB, so it works in VYRO mode; *Original* stops it.
 - Picture, sound, inputs, remote pairing, Google services and the Play Store are on a protected list, checked before every change, and so are Android's own pieces and factory menus. Before anything goes off, the TV is asked whether its inputs or its remote's Input key depend on it; those stay on.
 - On Google TV, the setup app goes off before the stock home screen and comes back after it, so its recovery screen never takes over the Home button in between.
 - Apps that saved a Wi-Fi network are never turned off, since Android would erase the network. If the TV's first setup (or its own home screen) saved yours, the switch asks you to forget the network and connect again in Settings first (saved networks out of range don't show there; Claude Code can remove them).
 
 ## Any TV
 
-Free My TV runs on Google TV and Android TV: TCL, Sony, Hisense, Philips, Xiaomi, Vestel-made TVs (F&U), KTC-made TVs (NextStar) and more, plus streamers like Chromecast with Google TV, the Google TV Streamer, onn 4K, the Xiaomi Mi TV Stick and NVIDIA Shield, and projectors like the Wanbo T2 Ultra. And on [LG](#lg-tvs-webos) and [Samsung](#samsung-tvs-tizen) TVs, as an app.
+VYRO runs on Google TV and Android TV: TCL, Sony, Hisense, Philips, Xiaomi, Vestel-made TVs (F&U), KTC-made TVs (NextStar) and more, plus streamers like Chromecast with Google TV, the Google TV Streamer, onn 4K, the Xiaomi Mi TV Stick and NVIDIA Shield, and projectors like the Wanbo T2 Ultra. And on [LG](#lg-tvs-webos) and [Samsung](#samsung-tvs-tizen) TVs, as an app.
 
-**Huawei TVs (HarmonyOS) and the Kalley 43G200:** there Free My TV stays an app you open. After the switch, one of each didn't start again (the Huawei came back only with a factory reset), so the switch refuses on them, and one already switched by an older version goes back to *Original* by itself. On Fire TV it's an app too: Amazon's home screen keeps the Home button.
+**Huawei TVs (HarmonyOS) and the Kalley 43G200:** there VYRO stays an app you open. After the switch, one of each didn't start again (the Huawei came back only with a factory reset), so the switch refuses on them, and one already switched by an older version goes back to *Original* by itself. On Fire TV it's an app too: Amazon's home screen keeps the Home button.
 
 **Any other TV:** plug a Google TV streamer into HDMI and free that one. Same steps, same home screen.
 
-**A different brand or model:** ask Claude. Free My TV is made to be adapted by AI. Open the folder in Claude Code and say *"set it up for my Sony"*: it reads your TV, finds its home screen and its promo apps, updates the lists below and walks you through a test. [CLAUDE.md](CLAUDE.md) tells it how.
+**A different brand or model:** ask Claude. VYRO is made to be adapted by AI. Open the folder in Claude Code and say *"set it up for my Sony"*: it reads your TV, finds its home screen and its promo apps, updates the lists below and walks you through a test. [CLAUDE.md](CLAUDE.md) tells it how.
 
 | What | Where |
 |---|---|
-| Apps to turn off | `DEBLOAT` in [`HomeMode.java`](app/src/io/freemytv/HomeMode.java) |
+| Apps to turn off | `DEBLOAT` in [`HomeMode.java`](app/src/io/vyro/tv/HomeMode.java) |
 | Apps never to touch | `PROTECTED` in the same file |
-| Apps on the shelf | `SHELF` in [`HomeApps.java`](app/src/io/freemytv/HomeApps.java) |
+| Apps on the shelf | `SHELF` in [`HomeApps.java`](app/src/io/vyro/tv/HomeApps.java) |
 | Your brand's live TV app | `LIVE_TV_APPS` in the same file |
 
 ## Make it yours
@@ -336,21 +336,21 @@ It's your code, and Claude Code finds its way around it. Try:
 
 | File | What it is |
 |---|---|
-| [`HomeView.java`](app/src/io/freemytv/HomeView.java) | The home screen |
-| [`HomeMode.java`](app/src/io/freemytv/HomeMode.java) | Switching between Free My TV and Original |
-| [`Adb.java`](app/src/io/freemytv/Adb.java) | The TV's own ADB, from inside the TV |
-| [`Recs.java`](app/src/io/freemytv/Recs.java) | The picks (TMDB) |
-| [`KeyPage.java`](app/src/io/freemytv/KeyPage.java), [`Qr.java`](app/src/io/freemytv/Qr.java) | The TMDB and Watchmode keys sent from a phone, and the QR code |
-| [`WatchNext.java`](app/src/io/freemytv/WatchNext.java) | Continue Watching from the TV's lists |
-| [`WatchArt.java`](app/src/io/freemytv/WatchArt.java) | Continue Watching pictures, only from the TV |
-| [`HomeData.java`](app/src/io/freemytv/HomeData.java) | Weather and prices |
-| [`HomeApps.java`](app/src/io/freemytv/HomeApps.java) | The shelf, inputs and All Apps |
-| [`DreamView.java`](app/src/io/freemytv/DreamView.java) | The screensaver |
-| [`SettingsActivity.java`](app/src/io/freemytv/SettingsActivity.java) | The settings screen (the app's icon) |
-| [`Prefs.java`](app/src/io/freemytv/Prefs.java) | Settings changed on the TV |
-| [`RemoteKeys.java`](app/src/io/freemytv/RemoteKeys.java) | The remote's app buttons (TCL, Sony, Xiaomi and others) |
-| [`RecentApps.java`](app/src/io/freemytv/RecentApps.java), [`ScreenBlur.java`](app/src/io/freemytv/ScreenBlur.java) | Recent Apps, over a blurred copy of the screen |
-| [`Watchdog.java`](app/src/io/freemytv/Watchdog.java) | The safety net |
+| [`HomeView.java`](app/src/io/vyro/tv/HomeView.java) | The home screen |
+| [`HomeMode.java`](app/src/io/vyro/tv/HomeMode.java) | Switching between VYRO and Original |
+| [`Adb.java`](app/src/io/vyro/tv/Adb.java) | The TV's own ADB, from inside the TV |
+| [`Recs.java`](app/src/io/vyro/tv/Recs.java) | The picks (TMDB) |
+| [`KeyPage.java`](app/src/io/vyro/tv/KeyPage.java), [`Qr.java`](app/src/io/vyro/tv/Qr.java) | The TMDB and Watchmode keys sent from a phone, and the QR code |
+| [`WatchNext.java`](app/src/io/vyro/tv/WatchNext.java) | Continue Watching from the TV's lists |
+| [`WatchArt.java`](app/src/io/vyro/tv/WatchArt.java) | Continue Watching pictures, only from the TV |
+| [`HomeData.java`](app/src/io/vyro/tv/HomeData.java) | Weather and prices |
+| [`HomeApps.java`](app/src/io/vyro/tv/HomeApps.java) | The shelf, inputs and All Apps |
+| [`DreamView.java`](app/src/io/vyro/tv/DreamView.java) | The screensaver |
+| [`SettingsActivity.java`](app/src/io/vyro/tv/SettingsActivity.java) | The settings screen (the app's icon) |
+| [`Prefs.java`](app/src/io/vyro/tv/Prefs.java) | Settings changed on the TV |
+| [`RemoteKeys.java`](app/src/io/vyro/tv/RemoteKeys.java) | The remote's app buttons (TCL, Sony, Xiaomi and others) |
+| [`RecentApps.java`](app/src/io/vyro/tv/RecentApps.java), [`ScreenBlur.java`](app/src/io/vyro/tv/ScreenBlur.java) | Recent Apps, over a blurred copy of the screen |
+| [`Watchdog.java`](app/src/io/vyro/tv/Watchdog.java) | The safety net |
 | [`web/home.js`](web/home.js) | The home screen on LG TVs |
 | [`web/tv.js`](web/tv.js) | The TV's apps and inputs, on LG and Samsung |
 | [`webos/build.py`](webos/build.py), [`webos/install.py`](webos/install.py), [`webos/renew.py`](webos/renew.py) | The LG app package, its install, and renewing Developer Mode |
@@ -384,11 +384,12 @@ reference (fix them by hand); the others were machine-made, and corrections from
 ## Privacy
 
 
-No accounts, no analytics, no tracking. The app talks to TMDB, Open-Meteo (their forecast at api.open-meteo.com, the city search at geocoding-api.open-meteo.com and, on LG and Samsung while the weather card is on, their air quality at air-quality-api.open-meteo.com, with the coordinates you set, or your time zone's main city), and Binance only when `show_crypto=true`, Watchmode only when you set a key, your Plex server only when you set a `plex_url`, your Immich server only when you set one, and Trakt (api.trakt.tv) only when you set a `trakt_client_id` and sign in on the TV. With `home_assistant_url` set and *Home Settings* → *Home Assistant* on, it talks to that server, yours, and to no other: only while the bottom drawer is open, to read the states of the entities you listed and to call the one you press. Turned off, nothing is asked of it, and the names it read are forgotten. On Google TV and Android TV, the APK from the release asks GitHub (api.github.com) once a week, or when you press *Updates*, for the latest release, and when there's a newer one downloads it from github.com and GitHub's download server (release-assets.githubusercontent.com); a build you made yourself asks only when you press *Updates*. The *Now Playing widget* reads what apps are playing (title, artist, the app) through a notification listener, the only way Android shares it: Free My TV allows the listener only while the widget is on, never reads a notification with it, and asks Android to unbind it as soon as it connects, so it stays unbound. What's playing never leaves the TV. While *Home Settings* → *TMDB key* or *Watchmode key* shows its QR code (5 minutes at most), the TV answers on your home network at that code's address, for one key; the key goes only to that service, to check it. Continue Watching (Home Settings) reads what your apps note on the TV itself and shows only pictures already on the TV: it downloads nothing. *Home Settings* → *Status icons* reads only whether the TV has Wi-Fi or Ethernet, a Bluetooth audio device and a mounted USB drive, and only while the row is on: on Android 12 and newer it asks for *Nearby devices* (BLUETOOTH_CONNECT) for the Bluetooth part, and none of it leaves the TV. Your settings stay on your computer and your TV.
+No accounts, no analytics, no tracking. The app talks to TMDB, Open-Meteo (their forecast at api.open-meteo.com, the city search at geocoding-api.open-meteo.com and, on LG and Samsung while the weather card is on, their air quality at air-quality-api.open-meteo.com, with the coordinates you set, or your time zone's main city), and Binance only when `show_crypto=true`, Watchmode only when you set a key, your Plex server only when you set a `plex_url`, your Immich server only when you set one, and Trakt (api.trakt.tv) only when you set a `trakt_client_id` and sign in on the TV. With `home_assistant_url` set and *Home Settings* → *Home Assistant* on, it talks to that server, yours, and to no other: only while the bottom drawer is open, to read the states of the entities you listed and to call the one you press. Turned off, nothing is asked of it, and the names it read are forgotten. On Google TV and Android TV, the APK from the release asks GitHub (api.github.com) once a week, or when you press *Updates*, for the latest release, and when there's a newer one downloads it from github.com and GitHub's download server (release-assets.githubusercontent.com); a build you made yourself asks only when you press *Updates*. The *Now Playing widget* reads what apps are playing (title, artist, the app) through a notification listener, the only way Android shares it: VYRO allows the listener only while the widget is on, never reads a notification with it, and asks Android to unbind it as soon as it connects, so it stays unbound. What's playing never leaves the TV. While *Home Settings* → *TMDB key* or *Watchmode key* shows its QR code (5 minutes at most), the TV answers on your home network at that code's address, for one key; the key goes only to that service, to check it. Continue Watching (Home Settings) reads what your apps note on the TV itself and shows only pictures already on the TV: it downloads nothing. *Home Settings* → *Status icons* reads only whether the TV has Wi-Fi or Ethernet, a Bluetooth audio device and a mounted USB drive, and only while the row is on: on Android 12 and newer it asks for *Nearby devices* (BLUETOOTH_CONNECT) for the Bluetooth part, and none of it leaves the TV. Your settings stay on your computer and your TV.
 
 
 ## Credits
 
+- VYRO is built on [Free My TV](https://github.com/simbasjungles/free-my-tv) (MIT) and its contributors, with the design of ibtzy TV Launcher.
 - Built with [Claude Code](https://claude.com/claude-code).
 - The LG version builds on what [@danielthejoker18](https://github.com/danielthejoker18) found in [FreeMyTvWebOS](https://github.com/danielthejoker18/FreeMyTvWebOS) (MIT): installing through Developer Mode and opening apps through the TV's service bus.
 - On Samsung TVs it installs with [TizenBrew Installer](https://github.com/reisxd/TizenBrewInstaller) by [@reisxd](https://github.com/reisxd).

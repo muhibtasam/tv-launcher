@@ -1,4 +1,4 @@
-import io.freemytv.GamesV1Logic;
+import io.vyro.tv.GamesV1Logic;
 import java.util.Arrays;
 import java.util.TimeZone;
 

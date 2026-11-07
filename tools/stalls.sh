@@ -6,7 +6,7 @@
 cd "$(dirname "$0")/.." || exit 1
 TV=${TV:-192.168.1.69:5555}; A="adb -s $TV"
 bash tools/tv_shot.sh "$1" x >/dev/null 2>&1
-PID=$($A shell pidof io.freemytv:home | tr -d '\r')
+PID=$($A shell pidof io.vyro.tv:home | tr -d '\r')
 $A shell dumpsys gfxinfo "$PID" reset >/dev/null
 for k in $2; do if [ "$k" = s ]; then sleep 1; else $A shell input keyevent "$k"; sleep 0.25; fi; done
 sleep 1

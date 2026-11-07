@@ -3,13 +3,13 @@
     <!-- The light background already in the window: opening the home screen never flashes another color. -->
     <color name="home_background">#EBEBF0</color>
 
-    <style name="FreeMyTV.Home" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
+    <style name="VYRO.Home" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
         <item name="android:windowBackground">@color/home_background</item>
         <item name="android:windowContentOverlay">@null</item>
         <item name="android:windowShowWallpaper">false</item>
         <item name="android:colorBackgroundCacheHint">@null</item>
     </style>
-    <style name="FreeMyTV.QuickSettings" parent="@android:style/Theme.DeviceDefault.Dialog.NoActionBar">
+    <style name="VYRO.QuickSettings" parent="@android:style/Theme.DeviceDefault.Dialog.NoActionBar">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowContentOverlay">@null</item>
@@ -18,7 +18,7 @@
     </style>
 
     <!-- The quick settings panel: see-through around its card, no dimming of what's playing. -->
-    <style name="FreeMyTV.Panel" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+    <style name="VYRO.Panel" parent="@android:style/Theme.DeviceDefault.NoActionBar">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowContentOverlay">@null</item>

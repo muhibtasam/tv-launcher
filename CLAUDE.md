@@ -1,10 +1,10 @@
-# Free My TV: notes for Claude
+# VYRO: notes for Claude
 
 A home screen for Google TV and Android TV that replaces the stock one, plus a settings app that switches between
-Free My TV and the TV's original home screen. A plain Android app in Java, built without Gradle by `build.sh`.
+VYRO and the TV's original home screen. A plain Android app in Java, built without Gradle by `build.sh`.
 LG TVs (webOS) and Samsung TVs (Tizen) get the same home screen as a web app: `web/`, packed by `webos/` and `tizen/`
 (see below).
-The website (freemytv.io) is in `docs/`: static HTML, CSS and JS, no build step. A push to `main` that changes it
+The website (github.com/muhibtasam/vyro) is in `docs/`: static HTML, CSS and JS, no build step. A push to `main` that changes it
 publishes it to GitHub Pages (`.github/workflows/pages.yml`). `docs/index.html` (English) and `docs/pt/index.html`
 (Brazilian Portuguese) are the same page in two languages, so change both; visitors from Brazil land on the
 Portuguese one by themselves, and the PT/EN switch in the menu is remembered.
@@ -24,9 +24,9 @@ before you do it, and let them do the taps on the TV.
   The Kalley 43G200 (`R3_GTV`) turns it back on at every start and boot-looped without its home screen, and a Huawei
   TV (HarmonyOS) stopped at its logo at the first restart after the switch (back only with a factory reset): the
   switch refuses on both (`HomeMode.BRICKS`, Huawei by brand or by `com.huawei.system.BuildEx.getOsBrand()`), and
-  the boot check or an update takes one already in Free My TV mode back to *Original*. On a phone (`HomeMode.phone`:
+  the boot check or an update takes one already in VYRO mode back to *Original*. On a phone (`HomeMode.phone`:
   telephony, no leanback, not in TV mode) the settings say the APK goes on the TV, and the switch refuses. On Amazon Fire TV (Fire OS: `HomeMode.AMAZON`), Amazon's launcher keeps the Home button (`priority=950`
-  on `CATEGORY_HOME`), so the switch refuses Free My TV mode while *Original* and the watchdog still run, and no
+  on `CATEGORY_HOME`), so the switch refuses VYRO mode while *Original* and the watchdog still run, and no
   `com.amazon.*` package is ever turned off (`mayTurnOff`).
 - Never turn off an app that saved a Wi-Fi network: Android deletes its networks and Original can't bring them
   back (`wifiOwners` in `HomeMode`). When the Wi-Fi service doesn't answer, the switch stops on Wi-Fi, and the boot
@@ -61,13 +61,13 @@ before you do it, and let them do the taps on the TV.
    it opens their photos, so it never goes in `config.properties` or the APK. They send it in their own terminal with
    `python3 tools/send_key.py <IP> immich_api_key` (Android 9+), which asks for it without showing it (yours can't
    answer that).
-5. **Build:** `./build.sh` → `FreeMyTV.apk`. Keep `freemytv.keystore`: updates must be signed with the same key.
+5. **Build:** `./build.sh` → `VYRO.apk`. Keep `freemytv.keystore`: updates must be signed with the same key.
 6. **Install:** `adb connect <IP>:5555`. The TV asks *Allow USB debugging?*: tell them to accept and tick *Always
-   allow*. Then `adb install -r FreeMyTV.apk`. If it hangs, Google Play Protect is asking on the TV (Android 14:
+   allow*. Then `adb install -r VYRO.apk`. If it hangs, Google Play Protect is asking on the TV (Android 14:
    *Risky app blocked*, "built for an older version of Android", since targetSdk is 33): they choose *More details* →
    *Install anyway* (updates don't ask again). Always through adb: an APK opened on the TV (a file manager, a browser)
    can get *App blocked to protect your device*, with no way past it, where Play Protect blocks sideloaded apps with an
-   accessibility service or a notification listener (#378). On TCL, also `adb shell "appops set io.freemytv AUTO_START allow || appops set io.freemytv APP_AUTO_START allow"`
+   accessibility service or a notification listener (#378). On TCL, also `adb shell "appops set io.vyro.tv AUTO_START allow || appops set io.vyro.tv APP_AUTO_START allow"`
    (some firmware calls the operation `APP_AUTO_START`; this tries both):
    TCL's `TclAppBoot` blocks background jobs by default, so the switch (and the watchdog) never run. The log shows
    `forbid bind service ... ModeJob`. An uninstall takes the permission back (moving from their own build to the
@@ -79,17 +79,17 @@ before you do it, and let them do the taps on the TV.
    has a second, separate background killer, `TGuard` (`com.tcl.guard`), which kills the app's processes about a second
    after any other app comes to the front. The switch's benchmark opens the original home screen a few times (that's
    the launcher flashing by during "Measuring…"), so TGuard can kill `ModeJob` there (log: `TGuardMemoryManagerKillHandler
-   ... tguard-kill`, then `Scheduling restart of crashed service io.freemytv/.ModeJob`). The JobScheduler runs the job
+   ... tguard-kill`, then `Scheduling restart of crashed service io.vyro.tv/.ModeJob`). The JobScheduler runs the job
    again by itself within a minute or two, and a benchmark that fails only logs now (it used to read as "Couldn't turn on
-   Free My TV: Read timed out", #277). Tell them: if the settings screen closes on the stock launcher, wait a minute or two, then press
-   Home; Free My TV opening confirms the switch. No `adb`/`appops` setting turns TGuard off (its content providers aren't
+   VYRO: Read timed out", #277). Tell them: if the settings screen closes on the stock launcher, wait a minute or two, then press
+   Home; VYRO opening confirms the switch. No `adb`/`appops` setting turns TGuard off (its content providers aren't
    exported to the shell user).
    Chromecast with Google TV (Android 14) refuses port 5555 even with USB debugging on: have them turn on *Wireless
    debugging*, pair with `adb pair <address:port> <code>` (the code is on the TV), then run `adb tcpip 5555` over that
    connection. It closes again at every restart (Wireless debugging turns itself off; `persist.adb.tcp.port` is
    refused), and until `adb tcpip 5555` runs again *Original*, the watchdog and the boot check can't reach ADB. Tell
    them before the switch (#195). Google TV's voice results for films and shows come from its home app (launcherx),
-   which Free My TV mode turns off; ADB can't turn off only its home activities, so tell them before they switch.
+   which VYRO mode turns off; ADB can't turn off only its home activities, so tell them before they switch.
    On a Mac, `adb connect` can fail with `No route to host` while the TV answers (`nc -z <IP> 5555` connects): macOS's
    Local Network privacy blocks the adb server that adb starts in the background. Start it from the same terminal
    instead (`adb kill-server; adb nodaemon server &`), or allow the terminal app under System Settings → Privacy &
@@ -97,28 +97,28 @@ before you do it, and let them do the taps on the TV.
 7. **Tell them what the switch does** before they make it: the home screen and screensaver change, a short list of
    promo apps is turned off (never uninstalled), and *Original* brings it all back. On TCL, the remote's Netflix,
    YouTube and Prime buttons keep working through a small accessibility service that only reads those buttons
-   (*Free My TV* → *Remote Buttons* picks what each opens); *Original* turns it off. On TCL's Android 11 there's no
-   service (the TV moved the volume twice with it), so there the buttons work only on Free My TV's home screen. On
-   Xiaomi TVs whose remote has no Home button, the same service makes its Mi button open Free My TV instead of PatchWall.
-8. **They switch on the TV:** *Free My TV* → *Home Screen* → *Free My TV*. The app uses the TV's own ADB on
+   (*VYRO* → *Remote Buttons* picks what each opens); *Original* turns it off. On TCL's Android 11 there's no
+   service (the TV moved the volume twice with it), so there the buttons work only on VYRO's home screen. On
+   Xiaomi TVs whose remote has no Home button, the same service makes its Mi button open VYRO instead of PatchWall.
+8. **They switch on the TV:** *VYRO* → *Home Screen* → *VYRO*. The app uses the TV's own ADB on
    127.0.0.1 with its own key, so the TV asks once more to allow debugging. Don't switch modes from the computer.
    Before they switch, run `adb disconnect <IP>:5555` (connect again for step 9): on Android 8 to 10 the TV can hand
    its answer to a computer that's still connected (#221).
    If the TV's Wi-Fi was saved during its first setup (or by its stock home screen: the message says which), the
    switch stops before changing anything and asks them to forget the network and connect again in Settings (Network &
-   Internet); then the switch goes through. `adb logcat -s FreeMyTV` names every app that saved one ("Wi-Fi networks
+   Internet); then the switch goes through. `adb logcat -s VYRO` names every app that saved one ("Wi-Fi networks
    saved by"). Saved networks out of range don't show in Settings: find the ones with
    `cname=com.google.android.tungsten.setupwraith` (or the home screen's package) in `adb shell dumpsys wifi` (each
    block starts with its `ID:`), and with their OK remove them with `adb shell cmd wifi forget-network <id>`. The
    check reads every `cname=` in that dump: from Android 11 each network shows up more than once (ConfigurationMap's
    `mPerId=` holds every user's, which `forget-network` can't reach), and a Passpoint profile's block has one too
    (#411).
-9. **Check:** `adb logcat -s FreeMyTV` shows what the switch did.
+9. **Check:** `adb logcat -s VYRO` shows what the switch did.
 
 ## Installing it on an LG TV (webOS)
 
 On LG it's an app, installed through LG's Developer Mode, and it changes nothing else on the TV: LG's home screen
-stays, and Free My TV opens with a long press of a number key.
+stays, and VYRO opens with a long press of a number key.
 
 1. **Ask** for the TV's IP address and their city, if they didn't say. Tools: Python 3 and OpenSSH (`ssh`,
    `ssh-keygen`), already on macOS, Linux and Windows 10+.
@@ -127,18 +127,18 @@ stays, and Free My TV opens with a long press of a number key.
    passphrase.
 3. **Settings:** the same `config.properties` as on Android (the first `python3 webos/build.py` creates it). The
    TMDB key rules above apply.
-4. **Build:** `python3 webos/build.py` must end with `Built FreeMyTV-webos.ipk`.
+4. **Build:** `python3 webos/build.py` must end with `Built VYRO-webos.ipk`.
 5. **Install:** the first time needs the TV's passphrase, typed by them: ask them to run
    `python3 webos/install.py <IP>` in their own terminal (yours can't answer its prompt, and the passphrase doesn't go
-   in the chat). It keeps the unlocked key in `~/.ssh/freemytv_webos_<IP>` (dots as underscores), so later updates
+   in the chat). It keeps the unlocked key in `~/.ssh/vyro_webos_<IP>` (dots as underscores), so later updates
    run from your terminal with the same command. On a TV that isn't 4K (`getSystemInfo` says `"UHD":"false"`), it
    changes the package's `resolution` to 1280x720 before copying it: LG's Full HD and HD sets draw apps at that size,
    and a 2019 HD one (webOS 3.9) showed a 1920x1080 app in its top-left two thirds (#402). `--1080p` installs it as
    built; `python3 webos/build.py --hd` builds it at 1280x720.
-6. **Tell them:** while Free My TV is open, holding a number key pins it to that key (on a remote without number keys,
+6. **Tell them:** while VYRO is open, holding a number key pins it to that key (on a remote without number keys,
    it's in LG's app list on the home screen). Developer Mode lasts about 40 days; *EXTEND* in that app renews it, or
    `python3 webos/renew.py <IP>` from the computer that installed it, on a schedule if they like (if it runs out, the TV
-   removes developer apps, and installing again brings it back). `--uninstall` removes Free My TV.
+   removes developer apps, and installing again brings it back). `--uninstall` removes VYRO.
 7. **Empty shelf on webOS 3** (user agent Chrome 38): the app can't list the TV's apps there (`listLaunchPoints`
    denied, no `getAppLoadStatus`, and the remote control API answers `invalid origin` to file:// pages). Run
    `python3 webos/apps.py <IP>`: the TV asks them once to allow it, then build and install again. It writes
@@ -175,7 +175,7 @@ Developer Mode; Samsung's home screen stays. Two ways:
    and `tizen cli-config "profiles.path=<home>/tizen-studio-data/profile/profiles.xml"`; on macOS the passwords go to
    the login Keychain). Certificate passwords are theirs: they type them in their own terminal, never in the chat. On Linux those passwords live in the GNOME keyring: `tizen package` reads them by running `secret-tool`, which a headless shell (a WSL install, a container) has not, and `security-profiles add` writes no `.pwd` file, so signing stops at `CertificationException: Invaild password` even though `keytool` opens the `.p12` with that same password. Leaving the profile item's `password=""` makes the CLI ask instead, and answering that prompt (a pseudo-terminal, not a pipe: without a console it throws a NullPointerException) signs it.
 5. **Settings:** the same `config.properties`; the TMDB key rules above apply.
-6. **Build and sign:** `python3 tizen/build.py --sign <profile>` must end with `Built FreeMyTV-tizen.wgt (...,
+6. **Build and sign:** `python3 tizen/build.py --sign <profile>` must end with `Built VYRO-tizen.wgt (...,
    signed with "<profile>")`.
 7. **Install:** `python3 tizen/install.py <IP>`: it pushes the app over SDB (port 26101), installs it with the TV's
    `0 vd_appinstall` and opens it with `0 was_execute` (tested on 2016 Tizen 2.4, 2017 Tizen 3.0, 2019 Tizen 5.0 and
@@ -183,7 +183,7 @@ Developer Mode; Samsung's home screen stays. Two ways:
    `/opt/usr/apps/tmp`; on 2015 firmware `developerMode` on port 8001 can read 0 while SDB works, and SDB resets the
    connection when the TV's Host PC IP isn't this computer's current one); it only reports success
    when the TV says `install completed` (`cmd_ret:0` comes after failures too). `--uninstall` removes
-   it; some TVs' sdbd doesn't answer that, and then it's removed on the TV (Apps, Settings, Free My TV, Delete).
+   it; some TVs' sdbd doesn't answer that, and then it's removed on the TV (Apps, Settings, VYRO, Delete).
    A bare `install failed[118]` (Tizen 2.4 gives no reason) can be a copy left by an earlier failed install, signed
    with another certificate and not shown on the TV: `--uninstall`, then install again (2016 KU6640 and KU6400, #349;
    the KU6400 took the Tizen certificate after that, while a Samsung one, Public with its DUID, kept getting 118). Still
@@ -193,16 +193,16 @@ Developer Mode; Samsung's home screen stays. Two ways:
    signer patch there changes their Tizen Studio, so ask first. If it still fails, the model refuses developer installs
    (a 2016 Full HD K5670, `16_HAWKM_FHD`, #349): suggest a Google TV streamer on HDMI.
    On a 2015 UN55JU6800 (Tizen 2.3, `15_HAWKM_UHD_2D_SC`) every package asking for `tv.inputdevice`, `application.launch`, `tv.window` or the Samsung `network.public` privilege was refused with `install failed[PKGMGR_ERROR]` at the same point, while the same files without them installed; changing the manifest also has to go through `--uninstall` first, since the TV refuses a changed one as an update. Once that TV was signed into a Samsung account, the build carrying none of those privileges launched apps and switched to the TV source anyway, so try that before buying a certificate: the same set does not trust the `VD DEVELOPER Partner CA Class` that issues them now, and refused even a minimal package signed with one (the DUID from port 8001 published as `uuid:` was accepted by the certificate tool).
-   With Samsung's tools instead: `sdb connect <IP>`, `tizen install -n FreeMyTV-tizen.wgt -t <serial from sdb
-   devices>` and `tizen run -p FreeMyTVio.FreeMyTV -t <serial>`. Updates need the same certificate: the TV refuses
+   With Samsung's tools instead: `sdb connect <IP>`, `tizen install -n VYRO-tizen.wgt -t <serial from sdb
+   devices>` and `tizen run -p FreeMyTVio.VYRO -t <serial>`. Updates need the same certificate: the TV refuses
    one signed by another (uninstall first). A retail TV's sdbd only takes files (`filesync_support:push`): nothing
-   can be pulled from it. To look inside the running app, `0 debug FreeMyTVio.FreeMyTV 300` over SDB opens it with
+   can be pulled from it. To look inside the running app, `0 debug FreeMyTVio.VYRO 300` over SDB opens it with
    a Web Inspector port (Runtime.evaluate works on Tizen 3; screenshots don't; Tizen 2.4 doesn't answer it, nor
    `0 vd_applist`). Tizen 2.3 (a 2015 UE48JU6075) answers it on port 7011, one WebSocket connection per launch
    (`ws://<IP>:7011/devtools/page/1`; `0 kill FreeMyTVio` first to launch it again), and `0 applist` lists its web
    apps (not the native ones, below).
 8. **Tell them:** *Autorun Last App* in the TV's settings (under Start Screen Options; where it is changes by year)
-   makes the TV turn on into Free My TV on a 2017 set; 2019 and 2020 sets don't reopen Developer Mode apps with it
+   makes the TV turn on into VYRO on a 2017 set; 2019 and 2020 sets don't reopen Developer Mode apps with it
    (#356), so there they move it to the first place in the Home bar. A Tizen Web Service declared `on-boot` that
    reopens it when the TV comes on worked on a 2019 RU7099 and a 2020 Q80T (a fork's opt-in build, #356), but only
    signed with a Partner-level distributor certificate bound to that TV's DUID, which the person requests from Samsung
@@ -212,25 +212,25 @@ Developer Mode; Samsung's home screen stays. Two ways:
 
 ## Releases
 
-Every release carries `FreeMyTV.apk` for Google TV and Android TV, built with `./build.sh --generic` (no
+Every release carries `VYRO.apk` for Google TV and Android TV, built with `./build.sh --generic` (no
 config.properties: no key, and `Place` takes the city, the currency and the region from the TV's time zone through
 `app/assets/zones.json`) and signed with the project's release key, which lives only on the owner's Mac
-(`~/.freemytv/release.keystore`, its password in the login Keychain as `freemytv-release-apk`):
+(`~/.freemytv/release.keystore`, its password in the login Keychain as `vyro-release-apk`):
 `FREEMYTV_KEYSTORE=~/.freemytv/release.keystore FREEMYTV_KEYSTORE_PASS="$(security find-generic-password -s
-freemytv-release-apk -w)" ./build.sh --generic`. Sign every release with that key: Android refuses an update signed
+vyro-release-apk -w)" ./build.sh --generic`. Sign every release with that key: Android refuses an update signed
 by another, and people who built their own must uninstall it before installing the release.
 
 TizenBrew Installer takes the first `.wgt` of the latest GitHub release, so every release carries
-`FreeMyTV-tizen.wgt`: built with `--generic` (no config.properties: no key, the city from the time zone) and signed
+`VYRO-tizen.wgt`: built with `--generic` (no config.properties: no key, the city from the time zone) and signed
 with a Tizen certificate (`--sign`), which 2017-2022 TVs install as it is; on 2023+ TVs the installer signs it again
 with the person's Samsung certificate. Sign every release with the same author certificate: older TVs refuse an
 update signed by another. `python3 webos/build.py --generic` makes the LG `.ipk` that goes along.
-The release's `FreeMyTV.apk` updates itself, never silently (`Updates` + `UpdateLogic`, Ibtzy's Feature 2.2): a daily
-job (ModeJob "update") and Home Settings > Updates read `muhibtasam/tv-launcher`'s `releases/latest` (the repo must be
+The release's `VYRO.apk` updates itself, never silently (`Updates` + `UpdateLogic`, Ibtzy's Feature 2.2): a daily
+job (ModeJob "update") and Home Settings > Updates read `muhibtasam/vyro`'s `releases/latest` (the repo must be
 public for TVs to read it), download and check the APK (GitHub's size and SHA-256, a higher `versionCode`, this package,
 signed with the same key as the installed app), then the home screen's update sheet asks: Install / Later. Keep the
-asset named `FreeMyTV.apk`, sign every release with the same keystore, and raise `versionName` and `versionCode`. Then
-`python3 tools/homebrew_repo.py <the uploaded FreeMyTV-webos.ipk>` writes `docs/webos/apps.json`, the webOS Homebrew
+asset named `VYRO.apk`, sign every release with the same keystore, and raise `versionName` and `versionCode`. Then
+`python3 tools/homebrew_repo.py <the uploaded VYRO-webos.ipk>` writes `docs/webos/apps.json`, the webOS Homebrew
 Channel repository (https://freemytv.io/webos/apps.json, with that file's SHA-256), and a copy of the `.ipk` beside it:
 commit both with the release. The Channel installs from freemytv.io, not from the GitHub release, because GitHub's
 download redirect carries more headers than the TV's Node accepts ("Parse Error: Header overflow").
@@ -257,15 +257,15 @@ Then, in the code:
   (the layer under HDMI and the tuner: off, inputs show "No signal") or receives the remote's Input key
   (`fusion.android.tv.demo` does on several MediaTek boards).
 - `HomeApps.SHELF`, `LIVE_TV_APPS` and `HIDDEN`: the shelf apps, the brand's live TV app, apps to hide from All Apps.
-- Build, install, have them switch on the TV, read `adb logcat -s FreeMyTV`, then have them switch back to
+- Build, install, have them switch on the TV, read `adb logcat -s VYRO`, then have them switch back to
   *Original* once and confirm everything returned.
 
 LG and Samsung: the web app above. Other TVs that don't run Google TV or Android TV: the way is a Google TV streamer on
-HDMI (Chromecast with Google TV, Google TV Streamer, onn 4K, NVIDIA Shield). Set Free My TV up on the streamer.
+HDMI (Chromecast with Google TV, Google TV Streamer, onn 4K, NVIDIA Shield). Set VYRO up on the streamer.
 The onn 4K Streaming Box (Amlogic S905Y4, Google TV 14 tested) ships no promo apps of its own, so `DEBLOAT` has no onn
 entries; its system pieces are in `PROTECTED`. USB debugging opens ADB on 5555 there, as the app needs.
 
-**Uninstalled while in Free My TV mode?** The apps it turned off stay off. Bring them back with
+**Uninstalled while in VYRO mode?** The apps it turned off stay off. Bring them back with
 `adb shell pm enable <package>` (the `DEBLOAT` list and the stock home screen), then
 `adb shell cmd package set-home-activity <stock home activity>` and
 `adb shell settings put secure screensaver_components <stock screensaver>`. On an HY300 with JmLauncher, also
@@ -275,7 +275,7 @@ entries; its system pieces are in `PROTECTED`. USB debugging opens ADB on 5555 t
 ## The code
 
 **The home screen is Ibtzy TV Launcher's design (2026-11-06 port): read `IBTZY_UI_PORT.md` first.** It says which
-classes came from Ibtzy, what was grafted where, which Free My TV features wait for a design, and the TV scripts
+classes came from Ibtzy, what was grafted where, which VYRO features wait for a design, and the TV scripts
 (`tools/perf_suite.sh` and friends) for measuring. Some notes below describe the previous home screen's drawing.
 
 - Java 8 language level, minSdk 26 (Android 8), targetSdk 33. No Gradle, no libraries: only the Android SDK.
@@ -345,7 +345,7 @@ classes came from Ibtzy, what was grafted where, which Free My TV features wait 
   are. Run `python3 tools/translate.py --check` to validate all catalogues without writing files.
   No right-to-left languages yet (the layout isn't mirrored); CJK and Devanagari use the system font.
   Comments in English, short, only where the why isn't obvious.
-- Settings come from `config.properties` through the generated `out/gen/io/freemytv/Config.java` (never edit that).
+- Settings come from `config.properties` through the generated `out/gen/io/vyro/tv/Config.java` (never edit that).
   Built with `--generic`, the place values are empty and `Place` fills them from the TV's time zone
   (`app/assets/zones.json`, written by `tools/make_zones.py` with `web/zones.js`).
   What the person changes on the TV (`Prefs`: Home Settings, Shelf, Remote Buttons, Sleep Timer) wins over those first values.
@@ -361,12 +361,12 @@ classes came from Ibtzy, what was grafted where, which Free My TV features wait 
   `.lan`, `.home.arpa`, a one-word name) and lists its host in the generated `network_security_config.xml`, the one
   place cleartext is allowed. A new feature that talks to a server on the user's network goes through it too.
 - Keys that open the user's own servers (the Immich key) stay out of the APK, which any app on the TV can read:
-  `tools/send_key.py` writes one over adb to `Secrets` (`content://io.freemytv.secrets/<name>`, only adb's shell may,
+  `tools/send_key.py` writes one over adb to `Secrets` (`content://io.vyro.tv.secrets/<name>`, only adb's shell may,
   only the names in `Secrets.NAMES`) into the app's private files, and `Secrets.get` reads it. `content query`
   answers present and when, never the value, so the tool can tell it arrived; adb's `content write` needs
   Android 9. A new feature with such a
   key adds its name there and to the tool.
-- Android 8 and 9 have no `cmd role`, and with Free My TV installed beside the stock launcher and no default home, HOME
+- Android 8 and 9 have no `cmd role`, and with VYRO installed beside the stock launcher and no default home, HOME
   answers with the chooser, so the switch takes `stockHome` instead (Original's pick: never where launcherx is installed, nor
   while an earlier switch's work is still off, after a reinstall), without timing its Home button. The boot check does
   the same for a TV switched earlier, only for Google's `tvlauncher`, since it runs by itself (#453: `tvrecommendations`
@@ -376,7 +376,7 @@ classes came from Ibtzy, what was grafted where, which Free My TV features wait 
 - Settings rows that need something this TV lacks stay, dimmed as *Unavailable*: `SettingsActivity.need` names what a
   row needs, `Capabilities.missing` says why it's missing (once per screen), and OK on the row shows it in a toast.
 - The remote's app buttons (`RemoteKeys`, `RemoteKeyService`) use each brand's key codes: they run only on TCL,
-  Vestel, KTC (NextStar), Sony, Xiaomi, Hisense and Philips' Google TV TVs, the JVC G24, Formovie projectors and the Google TV Streamer, the service is on only in Free My TV mode, and *Original* takes it out of the enabled accessibility
+  Vestel, KTC (NextStar), Sony, Xiaomi, Hisense and Philips' Google TV TVs, the JVC G24, Formovie projectors and the Google TV Streamer, the service is on only in VYRO mode, and *Original* takes it out of the enabled accessibility
   services. The system waits for the service on every key, so it lives alone in the `:keys` process: what it reads is
   in `remote-keys.txt` (`Prefs.keyApp`), never in SharedPreferences, and `onKeyEvent` does no heavy work.
   The service is also off while every button is *Nothing*, and always on TCL's Android 11 (`RemoteKeys.FILTER_SAFE`):
@@ -406,7 +406,7 @@ classes came from Ibtzy, what was grafted where, which Free My TV features wait 
   TV, and PatchWall's All Apps opens the disabled `tvlauncher`. `Prefs.KEY_MI` opens our home screen by default
   ("Xiaomi default", empty, leaves it to PatchWall). Leave PatchWall on: it also shows the TV's input picker.
   Xiaomi TVs with a Home button (MiTV-MOOR0, MediaTek, Android TV 11 tested) send `KEYCODE_BUTTON_3` for YouTube, a
-  global key for the stock home screen (`launcherx`) that Free My TV turns off, and `KEYCODE_BUTTON_5` for PatchWall,
+  global key for the stock home screen (`launcherx`) that VYRO turns off, and `KEYCODE_BUTTON_5` for PatchWall,
   a global key for the same `partnercustomizer` receiver: both are ours (`Prefs.KEY_XIAOMI_PATCHWALL` is left to the
   TV until an app is picked). Netflix (`BUTTON_6`) stays with the system. Their remote sends one press as a burst of 5
   to 8: `RemoteKeys` opens the app once (Xiaomi only).
@@ -420,7 +420,7 @@ classes came from Ibtzy, what was grafted where, which Free My TV features wait 
   remote has no Rutube button to clash with it). Netflix, Prime Video and YouTube open their apps unless picked, and
   its presses come one at a time, so no burst. `getevent` shows its presses on the remote's consumer-control interface,
   with codes that keylayout leaves unmapped (`KEY_VIDEOPHONE` for Netflix); what the framework dispatches comes from
-  its keyboard interface (`key 416 BUTTON_6`), so read key codes from `adb logcat -s FreeMyTV` ("remote key 193 -> …").
+  its keyboard interface (`key 416 BUTTON_6`), so read key codes from `adb logcat -s VYRO` ("remote key 193 -> …").
   The MiTV-AXSO2 (Amlogic `txlx`, Android TV 11, India; its home screen is `tvlauncher`, not `launcherx`) has a Home
   button, and `dumpsys window policy` hands `BUTTON_2` to `_7` and `_15` to that same receiver, which stays on, so its
   app buttons keep working without the service. Only its PatchWall button is listed (`RemoteKeys.XIAOMI_PATCHWALL_ONLY`,
@@ -428,11 +428,11 @@ classes came from Ibtzy, what was grafted where, which Free My TV features wait 
   app is picked. Its other buttons' codes weren't matched to the remote, so none of them is ours.
   Hisense (Q6N, MediaTek, Android TV 12 tested) sends `295` for Prime Video, `KEYCODE_BUTTON_3` for YouTube,
   `KEYCODE_ALL_APPS` for its All Apps (3×3) button, `KEYCODE_NOTIFICATION` for the gear and `KEYCODE_PROFILE_SWITCH`
-  for the profile button, all global keys for Google TV's home app (`launcherx`), which Free My TV mode turns off, and
+  for the profile button, all global keys for Google TV's home app (`launcherx`), which VYRO mode turns off, and
   `607` for Disney+: without the service they do nothing. Netflix (`KEYCODE_STEM_1`) stays with the system. The gear
   opens TV Settings and All Apps opens our own sheet (`Prefs.ALL_APPS`, `HomeActivity.EXTRA_ALL_APPS`); the profile
-  button has nothing to open without `launcherx`. Hisense keeps only error logs: `adb shell setprop log.tag.FreeMyTV I`
-  before reading `adb logcat -s FreeMyTV`.
+  button has nothing to open without `launcherx`. Hisense keeps only error logs: `adb shell setprop log.tag.VYRO I`
+  before reading `adb logcat -s VYRO`.
   Philips' Google TV models (`RemoteKeys.PHILIPS_GTV`: Android 13 and newer, by brand, maker or model name; a 65OLED910,
   `Philips Google TV TA5`, Android 14, gave the codes, #437, and no one has run it yet) send TP Vision's own numbers: 811
   Settings, 816 apps, `GUIDE`, 475 Netflix, 781 YouTube, 788 Prime Video. `org.droidtv.GlobalKey` hands Settings to
@@ -457,12 +457,12 @@ classes came from Ibtzy, what was grafted where, which Free My TV features wait 
   `Vendor_18d1_Product_9451.kl`. YouTube and the star go to launcherx; Netflix goes to chromecastservice. The model
   check excludes Chromecasts and other Google devices. YouTube opens YouTube initially; Netflix and the star stay
   with Google until an app is picked. An empty choice (*Google default*) passes the key through, so YouTube and the
-  star may do nothing with launcherx off. All three can also open Free My TV's All Apps; there is no separate
+  star may do nothing with launcherx off. All three can also open VYRO's All Apps; there is no separate
   long-press mapping. Home, Back, voice, power and volume stay with the system.
   The JVC G24 (Skyworth, Android 11 tested; `RemoteKeys.JVC_SKYWORTH`, by model name and Android version) sends its
   Inputs button as `KEYCODE_BUTTON_16` with scan code 383 (Bluetooth) or 79 (IR), or as `BUTTON_14` with 240, and its
   gear as `KEYCODE_NOTIFICATION` (`SkyworthRemote`; `BUTTON_16` with other scan codes is its app buttons, which stay
-  with the system). In Free My TV mode the Inputs button's vendor receiver crashes on Google TV's disabled provider and
+  with the system). In VYRO mode the Inputs button's vendor receiver crashes on Google TV's disabled provider and
   the gear asks for Google TV's disabled panel, so Inputs opens `com.smartdevice.dailyshortcut` directly
   (`Prefs.TV_SHORTCUTS`) and the gear our own small Quick Settings panel (`QuickSettingsActivity`). Leaving Google TV's
   home app on is no way around it there: its Home priority wins over ours. `tools/test-remote.sh` (run by
@@ -497,7 +497,7 @@ classes came from Ibtzy, what was grafted where, which Free My TV features wait 
   default): turning it on allows it through ADB (`HomeMode.nowPlayingAccess`, `cmd notification allow_listener`; the
   `enabled_notification_listeners` setting grants nothing since Android 8) and proves it took (`Capabilities.LISTENER`,
   else the row shows Unavailable); turning it off, *Original* and the watchdog's revert take it back. The switch to
-  Free My TV mode allows nothing. `HomeMode` sets it, under the `RUN` lock, to what the widget says at that moment (so
+  VYRO mode allows nothing. `HomeMode` sets it, under the `RUN` lock, to what the widget says at that moment (so
   quick toggles and a revert can't cross), `verifyNow` does the same after a boot or an update, and a screen that finds
   it on but not allowed asks once.
   It unbinds itself as soon as it connects (the permission is all it's for), and the home screen and the screensaver
@@ -544,7 +544,7 @@ classes came from Ibtzy, what was grafted where, which Free My TV features wait 
   (`service check launcherapps`: not found), so `LauncherApps.registerCallback` throws a NullPointerException and
   `HomeView` now catches it: the shelf doesn't refresh by itself after an install there, only when the home screen
   opens again. Its stock home is `com.htc.magcubicos`, which also holds the Wi-Fi, Bluetooth and projection settings:
-  in Free My TV mode nothing answers `android.settings.SETTINGS`, so TV Settings falls back to Android TV's own
+  in VYRO mode nothing answers `android.settings.SETTINGS`, so TV Settings falls back to Android TV's own
   `com.android.tv.settings/.MainSettings` by name (`HomeApps.open`), with Wi-Fi and Bluetooth; keystone and projection
   mode stay in magcubicos, out of reach while it's off (#379). Its own "ADB debug" switch turns on Wireless debugging,
   TLS-only on 5555, with no pairing screen in its settings: `com.android.tv.settings` (Activity Launcher, from
@@ -576,9 +576,9 @@ classes came from Ibtzy, what was grafted where, which Free My TV features wait 
   `HomeMode.wakeWatch` starts a shell loop through the TV's ADB (uid 2000, which the hook and `com.hikeen.cleanmaster`
   leave alone): it reads `DisplayPowerController`'s "Unblocked screen on" in the system log and opens the default home
   only while `FallbackHome` is in front. The switch and the boot check start it (a restart ends it), Original and the
-  watchdog's revert stop it; `adb shell pgrep -f 'freemytv-wak[e]'` shows it. Leave `cleanmaster` on: the loop doesn't
+  watchdog's revert stop it; `adb shell pgrep -f 'vyro-wak[e]'` shows it. Leave `cleanmaster` on: the loop doesn't
   need it off.
-- After any change, `./build.sh` must end with `Built FreeMyTV.apk`.
+- After any change, `./build.sh` must end with `Built VYRO.apk`.
 - LG and Samsung (`web/`): plain ES5 JavaScript and CSS without variables, grid or backdrop-filter, since older TVs
   (webOS 3 and 4, Tizen 3) run a Chromium from 2015 to 2017 (`tools/check.sh` greps for all of these); only transform
   and opacity animate. Tizen 2.4 (2016) runs WebKit 538: no Intl (`fmt` in data.js rounds by hand), SVGs need a width
@@ -599,7 +599,7 @@ classes came from Ibtzy, what was grafted where, which Free My TV features wait 
   TV's side: on LG, Luna (`listLaunchPoints`, `launch`, the inputs; where webOS 6 and newer deny `listLaunchPoints`
   to Developer Mode apps, the list comes from the TV's remote control API on `ws://127.0.0.1:3000` once the TV has
   allowed it (it asks once; a "no" isn't asked again; firmware that gives the page its own origin,
-  `file://io.freemytv-webos`, gets 1008 "invalid origin" there, and the call goes through `webos/service`, a JS
+  `file://io.vyro.tv-webos`, gets 1008 "invalid origin" there, and the call goes through `webos/service`, a JS
   service in the package whose handshake says `file://`; webOS 22 with 2026 firmware tested), and until then from
   `getAppLoadStatus` over a list of known app ids, which shows the logo bundled in `web/icons/` where there is one, otherwise the name on the brand's color);
   on Samsung, `tizen.application` (`getAppsInfo`, `launch`), the `VIDEOSOURCE` property and

@@ -1,4 +1,4 @@
-import io.freemytv.NetRecoveryLogic;
+import io.vyro.tv.NetRecoveryLogic;
 
 /** NetRecoveryLogic: when a recovery runs, and which failures it covers. */
 public class NetRecoveryLogicTest {

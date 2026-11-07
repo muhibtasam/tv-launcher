@@ -1,4 +1,4 @@
-import io.freemytv.UpdateLogic;
+import io.vyro.tv.UpdateLogic;
 
 import java.util.List;
 
@@ -10,7 +10,7 @@ public class UpdateLogicTest {
         if (!ok) { failed++; System.out.println("FAIL " + name); }
     }
 
-    private static final String DL = "https://github.com/muhibtasam/tv-launcher/releases/download/v1.2/FreeMyTV.apk";
+    private static final String DL = "https://github.com/muhibtasam/vyro/releases/download/v1.2/VYRO.apk";
 
     private static String release(String tag, String body, String assets) {
         return "{\"tag_name\":\"" + tag + "\",\"name\":\"ibtzy " + tag + "\",\"published_at\":\"2026-11-02T18:30:17Z\","
@@ -27,7 +27,7 @@ public class UpdateLogicTest {
 
         // A normal release: version from the tag, the APK, its size and digest, the date.
         UpdateLogic.Release r = UpdateLogic.parse(release("v1.2", "## What's new\\n- One\\n- Two",
-                "[" + apk("FreeMyTV.apk", 4_900_000, DL, "sha256:" + sha) + "]"));
+                "[" + apk("VYRO.apk", 4_900_000, DL, "sha256:" + sha) + "]"));
         check("parses", r != null && r.error == null);
         check("version from tag without v", r != null && "1.2".equals(r.version));
         check("apk url", r != null && DL.equals(r.apkUrl));
@@ -45,22 +45,22 @@ public class UpdateLogicTest {
         check("assets not an array", UpdateLogic.parse(release("v1.2", "x", "{}")).error != null);
         check("no apk among assets", UpdateLogic.parse(release("v1.2", "x", "[" + apk("notes.txt", 10, DL, null) + "]")).error != null);
         check("apk from another host", UpdateLogic.parse(release("v1.2", "x",
-                "[" + apk("FreeMyTV.apk", 10, "https://evil.example/FreeMyTV.apk", null) + "]")).error != null);
+                "[" + apk("VYRO.apk", 10, "https://evil.example/VYRO.apk", null) + "]")).error != null);
         check("apk from another repository", UpdateLogic.parse(release("v1.2", "x",
-                "[" + apk("FreeMyTV.apk", 10, "https://github.com/someone/else/releases/download/v1/a.apk", null) + "]")).error != null);
+                "[" + apk("VYRO.apk", 10, "https://github.com/someone/else/releases/download/v1/a.apk", null) + "]")).error != null);
         check("http, not https", UpdateLogic.parse(release("v1.2", "x",
-                "[" + apk("FreeMyTV.apk", 10, DL.replace("https:", "http:"), null) + "]")).error != null);
-        check("size 0", UpdateLogic.parse(release("v1.2", "x", "[" + apk("FreeMyTV.apk", 0, DL, null) + "]")).error != null);
-        check("huge size", UpdateLogic.parse(release("v1.2", "x", "[" + apk("FreeMyTV.apk", 400_000_000L, DL, null) + "]")).error != null);
-        check("bad digest text", UpdateLogic.parse(release("v1.2", "x", "[" + apk("FreeMyTV.apk", 10, DL, "sha256:xyz") + "]")).error != null);
-        check("bad tag", UpdateLogic.parse(release("latest", "x", "[" + apk("FreeMyTV.apk", 10, DL, null) + "]")).error != null);
-        UpdateLogic.Release noDigest = UpdateLogic.parse(release("1.3", null, "[" + apk("FreeMyTV.apk", 10, DL, null) + "]"));
+                "[" + apk("VYRO.apk", 10, DL.replace("https:", "http:"), null) + "]")).error != null);
+        check("size 0", UpdateLogic.parse(release("v1.2", "x", "[" + apk("VYRO.apk", 0, DL, null) + "]")).error != null);
+        check("huge size", UpdateLogic.parse(release("v1.2", "x", "[" + apk("VYRO.apk", 400_000_000L, DL, null) + "]")).error != null);
+        check("bad digest text", UpdateLogic.parse(release("v1.2", "x", "[" + apk("VYRO.apk", 10, DL, "sha256:xyz") + "]")).error != null);
+        check("bad tag", UpdateLogic.parse(release("latest", "x", "[" + apk("VYRO.apk", 10, DL, null) + "]")).error != null);
+        UpdateLogic.Release noDigest = UpdateLogic.parse(release("1.3", null, "[" + apk("VYRO.apk", 10, DL, null) + "]"));
         check("no digest listed: allowed (the signature is still checked)", noDigest.error == null && noDigest.sha256 == null);
         check("tag without v", "1.3".equals(noDigest.version));
         check("null body: no notes", noDigest.notes.isEmpty());
         UpdateLogic.Release two = UpdateLogic.parse(release("v1.2", "x", "[" + apk("other.apk", 10, DL.replace("ibtzyTVLauncher", "other"), null)
-                + "," + apk("FreeMyTV.apk", 20, DL, null) + "]"));
-        check("FreeMyTV.apk preferred among APKs", two.apkSize == 20);
+                + "," + apk("VYRO.apk", 20, DL, null) + "]"));
+        check("VYRO.apk preferred among APKs", two.apkSize == 20);
 
         // Versions: numbers compared one by one, missing as 0.
         check("1.2 > 1.1", UpdateLogic.compare("1.2", "1.1") > 0);

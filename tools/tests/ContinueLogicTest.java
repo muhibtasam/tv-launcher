@@ -1,5 +1,5 @@
-import io.freemytv.ContinueLogic;
-import io.freemytv.ContinueLogic.Entry;
+import io.vyro.tv.ContinueLogic;
+import io.vyro.tv.ContinueLogic.Entry;
 import java.util.*;
 
 /** Tests for Home's Continue row (no Android): run by tools/tests/run.sh. */

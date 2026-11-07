@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Installs Free My TV on an LG TV in Developer Mode, over your Wi-Fi.
+"""Installs VYRO on an LG TV in Developer Mode, over your Wi-Fi.
 
     python3 webos/install.py 192.168.1.50              # install or update, then open it
     python3 webos/install.py 192.168.1.50 --uninstall  # remove it
@@ -9,7 +9,7 @@ developer account (webostv.developer.lge.com), turn on Dev Mode Status (the TV r
 The app shows the TV's IP address and a passphrase.
 
 The first time, this downloads the TV's key from its Key Server and asks for that passphrase (type it here; it is
-not stored). The unlocked key is kept in ~/.ssh/freemytv_webos_<IP>, so updates need neither. The app is copied over
+not stored). The unlocked key is kept in ~/.ssh/vyro_webos_<IP>, so updates need neither. The app is copied over
 SSH (port 9922) and installed with the TV's own installer (com.webos.appInstallService), the way LG's tools do it.
 On a TV that isn't 4K (Full HD or HD), it goes in at 1280 x 720, the size those TVs draw apps at (--1080p: as built).
 Install flow based on FreeMyTvWebOS by danielthejoker18 (MIT). Needs Python 3 and OpenSSH (ssh, ssh-keygen).
@@ -28,16 +28,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'webos'))
 import build  # noqa: E402  (reads and changes the package's appinfo.json)
 
-IPK = os.path.join(ROOT, 'FreeMyTV-webos.ipk')
+IPK = os.path.join(ROOT, 'VYRO-webos.ipk')
 with open(os.path.join(ROOT, 'webos', 'appinfo.json'), encoding='utf-8') as f:
     APP_ID = json.load(f)['id']
-TEMP = '/media/developer/temp/freemytv.ipk'
+TEMP = '/media/developer/temp/vyro.ipk'
 SSH_OPTS = ['-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=' + os.devnull, '-o', 'LogLevel=ERROR',
             '-o', 'HostKeyAlgorithms=+ssh-rsa', '-o', 'PubkeyAcceptedKeyTypes=+ssh-rsa', '-p', '9922']
 
 
 def key_path(ip):
-    return os.path.join(os.path.expanduser('~'), '.ssh', 'freemytv_webos_' + ip.replace('.', '_'))
+    return os.path.join(os.path.expanduser('~'), '.ssh', 'vyro_webos_' + ip.replace('.', '_'))
 
 
 def lock(path):
@@ -136,7 +136,7 @@ def main():
     ssh(ip, key, 'rm -f ' + TEMP)
     luna(ip, key, 'luna://com.webos.applicationManager/launch', {'id': APP_ID})
     print('Installed and open on the TV.')
-    print('Tip: while Free My TV is open, hold a number key on the remote to open it with that key from anywhere.')
+    print('Tip: while VYRO is open, hold a number key on the remote to open it with that key from anywhere.')
     print('Developer Mode lasts about 40 days: open the Developer Mode app now and then and press EXTEND.')
 
 

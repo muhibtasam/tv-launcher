@@ -1,5 +1,5 @@
-import io.freemytv.MixLogic;
-import io.freemytv.MixLogic.Item;
+import io.vyro.tv.MixLogic;
+import io.vyro.tv.MixLogic.Item;
 
 import java.util.ArrayList;
 import java.util.HashMap;

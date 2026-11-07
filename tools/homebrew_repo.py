@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Writes docs/webos/apps.json, the repository the webOS Homebrew Channel reads (https://freemytv.io/webos/apps.json).
 
-    python3 tools/homebrew_repo.py FreeMyTV-webos.ipk
+    python3 tools/homebrew_repo.py VYRO-webos.ipk
 
 Run it at release time, on the exact .ipk uploaded to the GitHub release (built with `webos/build.py --generic`), and
 commit what it writes with the release: the JSON and a copy of the .ipk in docs/webos/. The Channel downloads `ipkUrl`,
@@ -69,9 +69,9 @@ def main():
         return 2
     data = open(sys.argv[1], 'rb').read()
     version = json.load(open(os.path.join(ROOT, 'webos', 'appinfo.json'), encoding='utf-8'))['version']
-    ipk = f'FreeMyTV-webos-{version}.ipk'
+    ipk = f'VYRO-webos-{version}.ipk'
     # Only the current release is served: older copies go.
-    for old in glob.glob(os.path.join(DIR, 'FreeMyTV-webos-*.ipk')):
+    for old in glob.glob(os.path.join(DIR, 'VYRO-webos-*.ipk')):
         if os.path.basename(old) != ipk:
             os.remove(old)
     with open(os.path.join(DIR, ipk), 'wb') as f:

@@ -1,4 +1,4 @@
-import io.freemytv.TitleWrap;
+import io.vyro.tv.TitleWrap;
 import java.util.Arrays;
 
 /** Tests for card titles wrapped to at most 2 lines (no Android): run by tools/tests/run.sh. */

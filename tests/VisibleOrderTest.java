@@ -1,4 +1,4 @@
-package io.freemytv;
+package io.vyro.tv;
 
 import java.util.ArrayList;
 import java.util.Arrays;

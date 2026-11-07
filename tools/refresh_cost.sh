@@ -18,9 +18,9 @@ for i in $(seq 1 ${2:-3}); do
 from perfetto.trace_processor import TraceProcessor
 tp=TraceProcessor(trace="/tmp/rc.pftrace")
 r=list(tp.query("""select round(sum(ts.dur)/1e6) ms from thread_state ts join thread t using(utid) join process p using(upid)
- where p.name like 'io.freemytv:home%' and t.name='freemytv-bg' and ts.state='Running'"""))
+ where p.name like 'io.vyro.tv:home%' and t.name='vyro-bg' and ts.state='Running'"""))
 print(r[0].ms)
 PY
 )
-  echo "$1 #$i background CPU ${cpu} ms  $($A logcat -d -s FreeMyTV | grep -m1 -oE 'app list [0-9]+ ms[^,]*')"
+  echo "$1 #$i background CPU ${cpu} ms  $($A logcat -d -s VYRO | grep -m1 -oE 'app list [0-9]+ ms[^,]*')"
 done

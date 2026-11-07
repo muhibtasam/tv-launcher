@@ -1,7 +1,7 @@
-import io.freemytv.AppContentLogic;
-import io.freemytv.AppContentLogic.Channel;
-import io.freemytv.AppContentLogic.Record;
-import io.freemytv.MixLogic;
+import io.vyro.tv.AppContentLogic;
+import io.vyro.tv.AppContentLogic.Channel;
+import io.vyro.tv.AppContentLogic.Record;
+import io.vyro.tv.MixLogic;
 
 import java.util.ArrayList;
 import java.util.Arrays;

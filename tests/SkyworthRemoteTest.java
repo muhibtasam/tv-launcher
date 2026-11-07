@@ -1,4 +1,4 @@
-package io.freemytv;
+package io.vyro.tv;
 
 public final class SkyworthRemoteTest {
     private static int assertions;

@@ -1,5 +1,5 @@
-import io.freemytv.MemoryPolicy;
-import io.freemytv.MemoryPolicy.Tier;
+import io.vyro.tv.MemoryPolicy;
+import io.vyro.tv.MemoryPolicy.Tier;
 
 /** MemoryPolicy: the tier from Android's readings, its fallbacks, and the budgets per tier. */
 public class MemoryPolicyTest {

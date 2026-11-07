@@ -4,7 +4,7 @@
 cd "$(dirname "$0")/.."
 A="adb -s ${TV:-192.168.1.69:5555}"
 $A shell mkdir -p /sdcard/Screensaver
-$A shell pm grant io.freemytv android.permission.READ_MEDIA_IMAGES 2>/dev/null
+$A shell pm grant io.vyro.tv android.permission.READ_MEDIA_IMAGES 2>/dev/null
 on_tv="$($A shell ls /sdcard/Screensaver 2>/dev/null | tr -d '\r')"
 for f in screensaver/*.{jpg,jpeg,png,webp,JPG,JPEG,PNG,WEBP}; do
   [ -f "$f" ] || continue

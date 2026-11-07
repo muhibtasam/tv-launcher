@@ -1,4 +1,4 @@
-import io.freemytv.TabsLogic;
+import io.vyro.tv.TabsLogic;
 
 /** Tests for Tabs V1's timing and sizes (no Android): run by tools/tests/run.sh. */
 public class TabsLogicTest {

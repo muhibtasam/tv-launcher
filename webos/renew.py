@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Renews LG Developer Mode so Free My TV keeps working, without the EXTEND button.
+"""Renews LG Developer Mode so VYRO keeps working, without the EXTEND button.
 
     python3 webos/renew.py 192.168.1.50
 
 Developer Mode lasts about 40 days; this resets the timer. Reads the TV's Developer Mode
-session token over the SSH key install.py cached (~/.ssh/freemytv_webos_<IP>), and posts it
-to LG's renewal endpoint. Install Free My TV first (webos/install.py), which caches the key;
+session token over the SSH key install.py cached (~/.ssh/vyro_webos_<IP>), and posts it
+to LG's renewal endpoint. Install VYRO first (webos/install.py), which caches the key;
 this never asks for the passphrase, so it runs unattended.
 
 Run it on a schedule (weekly is plenty, the window is ~40 days). The TV must be reachable on
 your network with Developer Mode on; when it isn't, this says so and changes nothing.
 
   cron (macOS, Linux), weekly:  0 3 * * 0 /usr/bin/python3 /path/to/webos/renew.py 192.168.1.50
-  Windows (Task Scheduler):     schtasks /create /tn FreeMyTVRenew /sc weekly /d SUN /st 03:00 \
+  Windows (Task Scheduler):     schtasks /create /tn VYRORenew /sc weekly /d SUN /st 03:00 \
                                   /tr "python \"C:\\path\\to\\webos\\renew.py\" 192.168.1.50"
 
 Needs Python 3 and OpenSSH (ssh). The token is a credential: it is never printed or logged,
@@ -54,7 +54,7 @@ def read_token(ip, key):
 def renew(ip):
     key = install.key_path(ip)
     if not os.path.exists(key):
-        sys.exit('No saved key for %s. Install Free My TV first: python3 webos/install.py %s' % (ip, ip))
+        sys.exit('No saved key for %s. Install VYRO first: python3 webos/install.py %s' % (ip, ip))
 
     token = read_token(ip, key)
     if not re.fullmatch(r'[0-9a-fA-F]{32,128}', token):

@@ -1,4 +1,4 @@
-import io.freemytv.GamesLogic;
+import io.vyro.tv.GamesLogic;
 
 /** Tests for the Games section's pure logic (no Android): run by tools/tests/run.sh. */
 public class GamesLogicTest {

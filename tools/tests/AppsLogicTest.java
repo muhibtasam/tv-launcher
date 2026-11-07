@@ -1,4 +1,4 @@
-import io.freemytv.AppsLogic;
+import io.vyro.tv.AppsLogic;
 import java.util.TimeZone;
 
 /** Tests for the Apps section's Spotlight logic (no Android): run by tools/tests/run.sh. */

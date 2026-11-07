@@ -1,4 +1,4 @@
-import io.freemytv.IconShape;
+import io.vyro.tv.IconShape;
 
 /** Tests for the round app icons' analysis (no Android): run by tools/tests/run.sh. */
 public class IconShapeTest {

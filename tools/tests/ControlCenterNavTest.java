@@ -1,4 +1,4 @@
-import io.freemytv.ControlCenterNav;
+import io.vyro.tv.ControlCenterNav;
 
 /** Tests for the Control Center's tiles and arrows (no Android): run by tools/tests/run.sh. */
 public class ControlCenterNavTest {

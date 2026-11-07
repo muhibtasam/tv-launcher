@@ -1,4 +1,4 @@
-import io.freemytv.MoviesLogic;
+import io.vyro.tv.MoviesLogic;
 import java.util.Arrays;
 
 /** Tests for For You's Movies V1 texts (no Android): run by tools/tests/run.sh. */

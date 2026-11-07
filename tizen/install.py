@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Installs Free My TV on a Samsung TV in Developer Mode, over your Wi-Fi, without Samsung's sdb.
+"""Installs VYRO on a Samsung TV in Developer Mode, over your Wi-Fi, without Samsung's sdb.
 
     python3 tizen/install.py 192.168.1.50              # install or update, then open it
     python3 tizen/install.py 192.168.1.50 --uninstall  # remove it
@@ -23,10 +23,10 @@ import time
 import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-WGT = os.path.join(ROOT, 'FreeMyTV-tizen.wgt')
+WGT = os.path.join(ROOT, 'VYRO-tizen.wgt')
 PORT = 26101
 MAX_DATA = 4096   # what this side announces; sdbd keeps each packet within both sides' maximum
-ON_TV = 'Apps, Settings, Free My TV, Delete'   # removing it on the TV itself
+ON_TV = 'Apps, Settings, VYRO, Delete'   # removing it on the TV itself
 
 
 class Sdb:
@@ -154,7 +154,7 @@ def main():
             sys.exit('Build and sign it first: python3 tizen/build.py --sign <profile>')
         with zipfile.ZipFile(WGT) as z:
             if 'author-signature.xml' not in z.namelist():
-                sys.exit('FreeMyTV-tizen.wgt isn\'t signed, and the TV only installs signed apps: '
+                sys.exit('VYRO-tizen.wgt isn\'t signed, and the TV only installs signed apps: '
                          'python3 tizen/build.py --sign <profile>')
             manifest = z.read('config.xml').decode('utf-8')
     tag = re.search(r'<tizen:application[^>]*>', manifest).group(0)
@@ -184,7 +184,7 @@ def main():
 
     # Tizen 2.4's sdbd names no sdk_toolpath and has no /home/owner: its tools' folder is /opt/usr/apps/tmp.
     default_path = '/opt/usr/apps/tmp' if caps.get('platform_version', '').startswith('2.') else '/home/owner/share/tmp/sdk_tools'
-    remote = caps.get('sdk_toolpath', default_path).rstrip('/') + '/FreeMyTV-tizen.wgt'
+    remote = caps.get('sdk_toolpath', default_path).rstrip('/') + '/VYRO-tizen.wgt'
     with open(WGT, 'rb') as f:
         data = f.read()
     print('Copying the app to the TV ...')
@@ -194,21 +194,21 @@ def main():
     if not re.search(r'install completed', out):
         hint = ''
         if 'different certificate' in out:
-            hint = ('\nThe Free My TV on the TV was signed with another certificate, and the TV only updates it with the '
+            hint = ('\nThe VYRO on the TV was signed with another certificate, and the TV only updates it with the '
                     'same one. Remove it on the TV (' + ON_TV + '), then run this again.')
         elif 'failed[118]' in out:
             # Tizen 2.4 gives no reason: a 2016 KU6640 answered this to every build after an install that failed
             # half-way, with nothing to see on the TV, until vd_appuninstall removed what was left (#349).
-            hint = ('\nThe TV may still hold a Free My TV signed with another certificate, even one that doesn\'t show '
+            hint = ('\nThe TV may still hold a VYRO signed with another certificate, even one that doesn\'t show '
                     '(a failed install can leave one). Remove it, then run this again:\n    python3 tizen/install.py %s '
-                    '--uninstall\n(That also clears what Free My TV keeps on the TV, such as a TMDB key typed there.) '
+                    '--uninstall\n(That also clears what VYRO keeps on the TV, such as a TMDB key typed there.) '
                     'Still failed[118] after that? Some models refuse developer installs altogether (a 2016 Full HD '
-                    'K5670 did, #349): a Google TV streamer on HDMI runs Free My TV there.' % ip)
+                    'K5670 did, #349): a Google TV streamer on HDMI runs VYRO there.' % ip)
         sys.exit('The TV didn\'t finish installing. It said:\n' + out.strip() + hint)
     sdb.shell('0 was_execute ' + app_id, r'launched|spend time', 20)
     print('Installed and open on the TV.')
     print('Tip: turn on Autorun Last App in the TV\'s settings (General, Smart Features; where it is changes by year) '
-          'and the TV turns on into Free My TV; on 2019 and 2020 TVs, move it to the first place in the Home bar instead.')
+          'and the TV turns on into VYRO; on 2019 and 2020 TVs, move it to the first place in the Home bar instead.')
 
 
 if __name__ == '__main__':

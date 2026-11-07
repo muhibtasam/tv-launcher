@@ -1,4 +1,4 @@
-import io.freemytv.HomeNav;
+import io.vyro.tv.HomeNav;
 
 /** Tests for Home's focus rules (no Android): run by tools/tests/run.sh. */
 public class HomeNavTest {

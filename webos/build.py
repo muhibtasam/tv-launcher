@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Builds Free My TV for LG webOS: FreeMyTV-webos.ipk, the app package the TV's Developer Mode installs.
+"""Builds VYRO for LG webOS: VYRO-webos.ipk, the app package the TV's Developer Mode installs.
 
-    python3 webos/build.py            # → FreeMyTV-webos.ipk
+    python3 webos/build.py            # → VYRO-webos.ipk
     python3 webos/build.py --preview  # also leaves the files in out/webos/ to open index.html in a browser
     python3 webos/build.py --config other.properties
     python3 webos/build.py --generic  # without config.properties: the TV's time zone picks the city (releases)
@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import webapp  # noqa: E402
 
 OUT = os.path.join(ROOT, 'out', 'webos')
-IPK = os.path.join(ROOT, 'FreeMyTV-webos.ipk')
+IPK = os.path.join(ROOT, 'VYRO-webos.ipk')
 # A TV's app list and icons from webos/apps.py, for TVs that won't list their apps to the app (webOS 3).
 APP_LIST = os.path.join(ROOT, 'webos-apps.local.json')
 APP_ICONS = os.path.join(ROOT, 'webos-icons.local')
@@ -151,8 +151,8 @@ def build(preview, config, generic=False, hd=False):
         service = {'service.js': f.read(),
                    'package.json': json.dumps({'name': service_id, 'version': version, 'main': 'service.js'},
                                               indent=2).encode('utf-8'),
-                   'services.json': json.dumps({'id': service_id, 'description': 'Free My TV',
-                                                'services': [{'name': service_id, 'description': 'Free My TV'}]},
+                   'services.json': json.dumps({'id': service_id, 'description': 'VYRO',
+                                                'services': [{'name': service_id, 'description': 'VYRO'}]},
                                                indent=2).encode('utf-8')}
     service_base = 'usr/palm/services/' + service_id
     entries += [('usr/palm/services', None), (service_base, None)]
@@ -165,7 +165,7 @@ def build(preview, config, generic=False, hd=False):
 
     size = sum(len(d) for d in app.values()) + sum(len(d) for d in service.values()) + len(package)
     control = ('Package: %s\nVersion: %s\nSection: misc\nPriority: optional\nArchitecture: all\nInstalled-Size: %d\n'
-               'Maintainer: Free My TV <https://freemytv.io>\nDescription: A fast, ad-free home screen.\n'
+               'Maintainer: VYRO <https://freemytv.io>\nDescription: A fast, ad-free home screen.\n'
                'webOS-Package-Format-Version: 2\nwebOS-Packager-Version: 1.0.0\n' % (app_id, version, size))
     data = ar([('debian-binary', b'2.0\n'), ('control.tar.gz', tar_gz([('control', control.encode('utf-8'))])),
                ('data.tar.gz', tar_gz(entries))])
