@@ -119,6 +119,17 @@ final class Updates {
         }
     }
 
+    /** How often the running home screen asks GitHub for a new release (HomeView.offerUpdate). */
+    static final long HOME_CHECK_MS = 60 * 60_000L;
+
+    /** No check under way and none in the last `everyMs` (or the clock went back): time to ask again. */
+    static boolean due(Context c, long everyMs) {
+        JSONObject s = state(c);
+        if (CHECKING.equals(s.optString("state"))) return false;
+        long at = s.optLong("at"), now = System.currentTimeMillis();
+        return at == 0 || now - at >= everyMs || now < at;
+    }
+
     // MARK: - Check and download
 
     /** Reads the latest release and, when it's newer, downloads and checks it. On a background thread; never throws. */

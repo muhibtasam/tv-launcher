@@ -8860,9 +8860,16 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             final Context app = getContext().getApplicationContext();
             LOADER.execute(() -> {
                 Updates.Offer o = Updates.offer(app);
+                // A new release shows within the hour, not at the next daily job: while the home screen runs, it
+                // asks GitHub itself once an hour (here, not as a job: TCL can hold an app's jobs back).
+                if (o == null && Updates.due(app, Updates.HOME_CHECK_MS)) {
+                    Updates.checkNow(app);
+                    o = Updates.offer(app);
+                }
+                final Updates.Offer found = o;
                 handler.post(() -> {
-                    if (o != null && running && !updateSheet.open && !controlCenter.ccOpen) updateSheet.show(o);
-                    else if (running) handler.postDelayed(offerUpdate, 30 * 60_000L);   // the daily check may find one
+                    if (found != null && running && !updateSheet.open && !controlCenter.ccOpen) updateSheet.show(found);
+                    else if (running) handler.postDelayed(offerUpdate, 15 * 60_000L);   // and looks again
                 });
             });
         }
