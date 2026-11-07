@@ -84,7 +84,7 @@ final class WatchNext {
         Set<String> off = Prefs.watchOff(), hidden = Prefs.watchHidden();
         for (java.util.Iterator<Item> i = all.iterator(); i.hasNext(); ) {
             Item it = i.next();
-            if (off.contains(it.pkg) || hidden.contains(hideKey(it))) i.remove();
+            if (off.contains(it.pkg) || ContinueLogic.stillHidden(hidden, hideKey(it), it.engaged, it.position)) i.remove();
         }
         Collections.sort(all, (a, b) -> Long.compare(b.engaged, a.engaged));
         List<Item> out = new ArrayList<>();

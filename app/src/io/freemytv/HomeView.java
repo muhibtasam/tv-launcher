@@ -117,11 +117,11 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private static final long TOAST_MS = 6000, FADE_MS = 480;   // crossfades (background, hero): 800 before
     /** Blur radii of the shadow and shadowDeep paints (Shadows needs them to draw the same blur on older TVs). */
     static final float SHADOW_BLUR = 26, DEEP_BLUR = 30;
-    private static final int SKY = 0, HERO = 1, STATUS = 2, PLATTER = 3, TILES = 4, DRAWER = 5, SHEET = 6, TOAST = 7, BOOT = 8, CC = 9, TOPFADE = 10;
+    private static final int SKY = 0, HERO = 1, STATUS = 2, PLATTER = 3, TILES = 4, DRAWER = 5, SHEET = 6, TOAST = 7, BOOT = 8, CC = 9, TOPFADE = 10, UPDATE = 11;
     /** Trace section names per layer kind: tools/trace.sh shows which layers redraw on each frame. */
     private static final String[] LAYER_TRACE = {
         "layer sky", "layer hero", "layer status", "layer platter", "layer tiles", "layer drawer", "layer sheet", "layer toast",
-        "layer boot", "layer cc", "layer topfade"};
+        "layer boot", "layer cc", "layer topfade", "layer update"};
     private static final int Z_STATUS = 0, Z_HERO = 1, Z_SHELF = 2, Z_DRAWER = 3;
     static final ExecutorService LOADER = Recs.lowPriority(1);   // below the UI: Home's animation first
     // Light design (the L_ constants): title, tab bar, three recommendation cards and the shelf.
@@ -174,7 +174,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
      */
     private final Layer bootLayer;
     /** The Control Center (the round Settings button): above everything but the toasts; the screen under it stays. */
-    final Layer ccLayer;
+    final Layer ccLayer, updateLayer;
     private boolean booting;
     private long bootFadeAt, bootStartedAt;
     private static final long BOOT_MAX_MS = 8000, BOOT_FADE_MS = 220;
@@ -496,6 +496,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 case SHEET: drawSheet(c); break;
                 case BOOT: drawBoot(c); break;
                 case CC: controlCenter.drawCC(c); break;
+                case UPDATE: updateSheet.draw(c); break;
                 case TOPFADE: drawTopFade(c); break;
                 default: drawToast(c); break;
             }
@@ -582,18 +583,19 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         toastLayer = new Layer(a, TOAST);
         bootLayer = new Layer(a, BOOT);
         ccLayer = new Layer(a, CC);
+        updateLayer = new Layer(a, UPDATE);   // the update sheet (UpdateSheet), over the Control Center
         // No hardware layers. They were meant to redraw only the layer that changed, but on a focus move the background
         // crossfades and every glass layer follows it, so each layer was redrawn into its own texture and then
         // composited: twice the GPU work. Measured on the TCL C6K (Mali-G52, Android 14), frame time p50 before → after:
         // Home cards 75.6 → 27.1 ms, Apps 82.4 → 27.2, Movies 67.2 → 46.9, tab switch 96.2 → 63.5; the dock was within
         // its run-to-run noise (38–68 ms either way). Older GPUs (Android 8 to 11) never had them either.
-        for (View v : new View[] {heroLayer, status, platter, platterNext, tiles, drawerLayer, sheetLayer, ccLayer}) v.setLayerType(LAYER_TYPE_NONE, null);
+        for (View v : new View[] {heroLayer, status, platter, platterNext, tiles, drawerLayer, sheetLayer, ccLayer, updateLayer}) v.setLayerType(LAYER_TYPE_NONE, null);
         // Except the background (2026-10-28): its photo, a small image stretched over the whole screen through a filter,
         // cost the GPU ~12 ms on every frame of a focus move (Home: 22.7 ms frames, 10.9 without it). In a layer it's
         // rendered once and composited as is; only its crossfades redraw it.
         sky.setLayerType(LAYER_TYPE_HARDWARE, null);
         topFade.setVisibility(INVISIBLE);
-        for (View v : new View[] {sky, heroLayer, status, topFade, platter, platterNext, tiles, drawerLayer, sheetLayer, ccLayer, toastLayer, bootLayer}) {
+        for (View v : new View[] {sky, heroLayer, status, topFade, platter, platterNext, tiles, drawerLayer, sheetLayer, ccLayer, updateLayer, toastLayer, bootLayer}) {
             v.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);   // TalkBack reads the items (Spoken)
             addView(v);
         }
@@ -605,6 +607,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         bootStartedAt = SystemClock.uptimeMillis();
         bootLayer.setVisibility(booting ? VISIBLE : GONE);
         ccLayer.setVisibility(GONE);
+        updateLayer.setVisibility(GONE);
         handler.postDelayed(controlCenter::findAirplay, 10_000);   // looked up early, so the AirPlay tile is ready when opened
         drawerLayer.setVisibility(INVISIBLE);
         platterNext.setVisibility(INVISIBLE);
@@ -787,6 +790,11 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         NetRecovery.start(getContext());   // once per process
         NetRecovery.setListener(networkBack);
         handler.postDelayed(tick, 15_000);
+        GoogleAlerts.listen(this::alertsChanged);
+        final Context alertsApp = getContext().getApplicationContext();
+        LOADER.execute(() -> GoogleAlerts.firstRun(alertsApp));
+        handler.removeCallbacks(offerUpdate);
+        handler.postDelayed(offerUpdate, 3_000);
         updatePalette();
         updatePicks();
         if (tab == 0 && !cards.isEmpty()) {   // the check for "Explore reloads": Home's cards still in memory on return?
@@ -817,6 +825,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         Choreographer.getInstance().removeFrameCallback(this);
         NetRecovery.setListener(null);   // hidden: what failed is asked for again when it shows
         handler.removeCallbacks(tick);
+        handler.removeCallbacks(offerUpdate);
+        GoogleAlerts.listen(null);
         handler.removeCallbacks(reloadSoon);
         handler.removeCallbacks(afterReturn);
         handler.removeCallbacks(followRested);
@@ -913,6 +923,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         resetForYou();
         wake();
         controlCenter.closeCC(!animated);
+        updateSheet.dismiss(true, !animated);   // Home on the remote: as Later
         cancelReorder(!animated);
         closeContMenu();
         // Home on the remote: straight to the Home tab, focus on it (the dock's first app when there are no picks).
@@ -1070,6 +1081,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         measure(toastLayer, Math.round(1000 * kk), Math.round(220 * kk));
         measure(bootLayer, width, height);
         measure(ccLayer, width, height);
+        measure(updateLayer, width, height);
         setMeasuredDimension(width, height);
     }
 
@@ -1101,6 +1113,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         place(toastLayer, (width - toastLayer.getMeasuredWidth()) / 2, 0);
         bootLayer.layout(0, 0, width, height);
         ccLayer.layout(0, 0, width, height);
+        updateLayer.layout(0, 0, width, height);
     }
 
     private static void place(View v, int x, int y) {
@@ -1326,6 +1339,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         tilesDirty = statusDirty = heroDirty = drawerDirty = gridDirty = motionDirty = false;
         boolean boot = stepBoot(up);
         boolean ccMoving = controlCenter.stepCC(dt);
+        boolean updateMoving = updateSheet.step(dt);
         if (updateClock()) {
             layoutStatus();
             status.invalidate();
@@ -1346,7 +1360,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             heroLayer.invalidate();
         }
         if (benchForce != 0) sky.invalidate();
-        boolean busy = platesDue || benchForce != 0 || boot || ccMoving || controlCenter.ccOpen || tilesMoving || hideMoving || statusMoving || heroMoving || drawerItemsMoving || gridMoving || drawerMoving
+        boolean busy = platesDue || benchForce != 0 || boot || ccMoving || controlCenter.ccOpen || updateMoving || tilesMoving || hideMoving || statusMoving || heroMoving || drawerItemsMoving || gridMoving || drawerMoving
                 || sheetMoving || toastFading || heroFading || greetFading || bgFading || nightMoving || dimMoving || glassFading || skeleton
                 || (!appsInTab() && (sheetOpen || sheet.value > 0.001f))   // Apps in its tab rests like the other tabs
                 || drawerOpen || drawer.value > 0.001f || toast != null || !toasts.isEmpty();
@@ -7117,6 +7131,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             if (e.getAction() == KeyEvent.ACTION_DOWN) bootFadeAt = lastKeyAt;   // shows the real screen now
             return true;
         }
+        if (updateSheet.open) return updateSheet.key(e);   // the update sheet: Install or Later, nothing under it
         if (controlCenter.ccOpen) return controlCenter.ccKey(e);   // nothing reaches the screen under it
         if (gameSheet != null) return gameSheetKey(e);   // a game's details: nothing reaches the rows under it
         boolean down = e.getAction() == KeyEvent.ACTION_DOWN;
@@ -8793,6 +8808,47 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     /** One card's skeleton (its shape, icon, title and line placeholders, the sweeping light), at `alpha`. */
     // MARK: - Control Center: ControlCenter.java (created here, where its fields were, so it's ready in the same order)
     final ControlCenter controlCenter = new ControlCenter(this);
+    final UpdateSheet updateSheet = new UpdateSheet(this);
+
+    /** Google alerts changed (or were seen): the Control Center button's dot, and the panel if it's open. */
+    void alertsChanged() {
+        statusDirty = true;
+        status.invalidate();
+        controlCenter.alertsChanged();
+        wake();
+    }
+
+    /** The update sheet, once per version, only on the home screen at rest (nothing open, nothing moving, no key for 2 s). */
+    private final Runnable offerUpdate = new Runnable() {
+        @Override public void run() {
+            if (!running) return;
+            boolean rest = idle && !booting && !controlCenter.ccOpen && !updateSheet.open && gameSheet == null && !sheetOpen
+                    && !drawerOpen && !reordering && contMenu < 0 && tab == 0 && SystemClock.uptimeMillis() - lastKeyAt > 2_000;
+            if (!rest) {
+                handler.postDelayed(this, 2_000);
+                return;
+            }
+            final Context app = getContext().getApplicationContext();
+            LOADER.execute(() -> {
+                Updates.Offer o = Updates.offer(app);
+                handler.post(() -> {
+                    if (o != null && running && !updateSheet.open && !controlCenter.ccOpen) updateSheet.show(o);
+                    else if (running) handler.postDelayed(offerUpdate, 30 * 60_000L);   // the daily check may find one
+                });
+            });
+        }
+    };
+
+    /** Settings › Updates: the sheet now, Later or not. */
+    void showUpdateNow() {
+        final Context app = getContext().getApplicationContext();
+        LOADER.execute(() -> {
+            Updates.Offer o = Updates.available(app);
+            handler.post(() -> {
+                if (o != null) updateSheet.show(o);
+            });
+        });
+    }
 
     /** The first-start skeleton: still showing (true) and its light moving; ends with a quick fade. */
     private boolean stepBoot(long up) {
@@ -9275,7 +9331,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     }
 
     /** A service's round 3D icon (diameter d at x, y): its art in a circle, lit from the top, a soft shadow under it. */
-    private void drawRoundIcon(Canvas c, Bitmap art, float x, float y, float d) {
+    void drawRoundIcon(Canvas c, Bitmap art, float x, float y, float d) {
         tmp.set(x, y + 6 * k, x + d, y + d + 6 * k);
         shadowSoft.setColor(0x73000000);
         shadows.drawCached(c, tmp, d / 2, 12 * k, shadowSoft);
@@ -9440,6 +9496,15 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             Symbols.draw(getContext(), c, it.symbol, cell.centerX(), cell.centerY(), 27 * k * s,
                     blend(tone(L_INK, accent(0.92f)), L_INK, f));
             // No name or status under them: it covered the weather and clock. Wi-Fi/Bluetooth state shows in the icon.
+            if (HomeApps.TOP_SETTINGS.equals(it.key) && GoogleAlerts.unread(getContext())) {
+                // New Google alerts: an orange dot at the button's top right, ringed in the screen's dark.
+                float dx = cell.centerX() + rad * 0.7071f, dy = cell.centerY() - rad * 0.7071f;
+                fill.setShader(null);
+                fill.setColor(0xFF0F0C0D);
+                c.drawCircle(dx, dy, 10 * k, fill);
+                fill.setColor(0xFFFFB27A);
+                c.drawCircle(dx, dy, 7 * k, fill);
+            }
         }
     }
 

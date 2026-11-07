@@ -189,8 +189,8 @@ public class SettingsActivity extends Activity {
         private final List<String[]> cities = new ArrayList<>();
         private String cityStatus = "";
         private JSONObject updates = new JSONObject();   // Updates' file (the main process writes it), read in poll
-        private long checkAskedAt, installAskedAt;       // OK on Updates, on the wall clock as the file's "at"
-        private String installed = "";                   // this app's version (an update starts a new process)
+        private long checkAskedAt;                       // OK on Updates, on the wall clock as the file's "at"
+        private boolean updateReady, alertsOn;           // read in poll: no file or system call while drawing
         // TMDB key: the page a phone opens (KeyPage), its QR code and what the screen says, all made when they change,
         // never while drawing.
         private KeyPage keyPage;
@@ -239,6 +239,8 @@ public class SettingsActivity extends Activity {
                 recs = Recs.status(getContext());
                 String updatesWas = updatesValue();
                 updates = Updates.state(getContext());
+                updateReady = Updates.available(getContext()) != null;
+                alertsOn = GoogleAlerts.on(getContext());
                 if (screen == HOME_SETTINGS && pickScroll + focus == updatesRow() && !updatesWas.equals(updatesValue())) {
                     spoken.focusMoved();   // TalkBack reads the Updates row's new value
                 }
@@ -271,7 +273,7 @@ public class SettingsActivity extends Activity {
                 // Redrawn only when something shown changed: also My Photos' count (Immich's arrive while it shows) and
                 // the minute (the notices' "{n} min ago").
                 String stamp = state.toString() + recs.toString() + updates.toString() + ":" + sleepLeft + ":" + whyNow
-                        + ":" + hasKey + ":" + pendingAt + ":" + stalled + ":" + busy() + ":" + updatesValue()
+                        + ":" + hasKey + ":" + pendingAt + ":" + stalled + ":" + busy() + ":" + updatesValue() + ":" + alertsValue()
                         + ":" + (Trakt.available() ? traktValue() : "") + ":" + System.currentTimeMillis() / 60_000
                         + ":" + (screen == HOME_SETTINGS ? Photos.files(getContext()).size() : 0);
                 if (!stamp.equals(pollStamp)) invalidate();
@@ -290,7 +292,6 @@ public class SettingsActivity extends Activity {
             scene.applyPalette();
             setFocusable(true);
             setContentDescription("Free My TV");
-            installed = Updates.installedVersion(a);
             // TalkBack: one item per row, id = row + 1.
             spoken = new Spoken(this, new Spoken.Source() {
                 @Override public void items(List<Integer> out) { for (int i = 1; i <= rowCount(); i++) out.add(i); }
@@ -1029,11 +1030,16 @@ public class SettingsActivity extends Activity {
             l.add(Ui.tr("TMDB key"));
             l.add(Ui.tr("Watchmode key"));
             l.add(Ui.tr("Updates"));
+            l.add(Ui.tr("Google notifications"));
             return l.toArray(new String[0]);
         }
 
-        /** The Updates row: the last one, after the coins and the keys. */
+        /** The Updates row: after the coins and the keys, before Google notifications (the last one). */
         private int updatesRow() {
+            return settingLabels().length - 2;
+        }
+
+        private int alertsRow() {
             return settingLabels().length - 1;
         }
 
@@ -1147,10 +1153,11 @@ public class SettingsActivity extends Activity {
             if (HOME_ROW >= 0) v[HOME_ROW] = onOff(HomeAssistant.on(getContext()));
             v[QUOTES_ROW] = onOff(Prefs.quotes());
             // No quotes widget, nowhere to show prices: the coins read as off (and stay locked) until it is back on.
-            for (int i = COIN_ROWS; i < v.length - 3; i++) v[i] = onOff(Prefs.quotes() && Prefs.coin(i - COIN_ROWS));
-            v[v.length - 3] = keyValue(Recs.key());
-            v[v.length - 2] = keyValue(Recs.watchmodeKey());
-            v[v.length - 1] = updatesValue();
+            for (int i = COIN_ROWS; i < v.length - 4; i++) v[i] = onOff(Prefs.quotes() && Prefs.coin(i - COIN_ROWS));
+            v[v.length - 4] = keyValue(Recs.key());
+            v[v.length - 3] = keyValue(Recs.watchmodeKey());
+            v[v.length - 2] = updatesValue();
+            v[v.length - 1] = alertsValue();
             return v;
         }
 
@@ -1563,42 +1570,75 @@ public class SettingsActivity extends Activity {
         // MARK: - Updates (GitHub's releases)
 
         /**
-         * OK on Updates: installs one that's ready, else checks now. Both run as jobs in the main process, as the week's
-         * check does, so one process writes the state; this screen reads it in poll.
+         * OK on Updates: the update sheet on the home screen when one is ready (Install / Later; nothing installs by
+         * itself), else a check now. The check runs as a job in the main process, as the daily one does, so one
+         * process writes the state; this screen reads it in poll.
          */
         private void updateNow() {
             Context c = getContext();
             updates = Updates.state(c);
-            long now = System.currentTimeMillis();
-            if (Updates.ready(updates, installed)) {
-                if (now - installAskedAt < 5000) return;   // Android's installer is on its way
-                installAskedAt = now;
-                ModeJob.schedule(c, ModeJob.INSTALL, "", 0);
-            } else {
-                if (Updates.busy(updates) || checkAsked()) return;
-                checkAskedAt = now;
-                ModeJob.schedule(c, ModeJob.UPDATE, "", 0);
+            updateReady = Updates.available(c) != null;
+            if (updateReady) {
+                activity.startActivity(new Intent(c, HomeActivity.class).putExtra(HomeActivity.EXTRA_UPDATE, true)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+                activity.finish();
+                return;
             }
+            if (checking() || checkAsked()) return;
+            checkAskedAt = System.currentTimeMillis();
+            ModeJob.schedule(c, ModeJob.UPDATE, "", 0);
             handler.removeCallbacks(poll);
             handler.postDelayed(poll, 500);
             invalidate();
             spoken.focusMoved();
         }
 
+        private boolean checking() {
+            return Updates.CHECKING.equals(updates.optString("state"));
+        }
+
         /** OK asked for a check that hasn't started yet (the job writes "checking" as it starts). */
         private boolean checkAsked() {
-            long now = System.currentTimeMillis();
-            return now - checkAskedAt < 10_000 && updates.optLong("at") < checkAskedAt;
+            return System.currentTimeMillis() - checkAskedAt < 10_000 && updates.optLong("at") < checkAskedAt;
         }
 
-        /** The Updates row: what the last check found, or "Checking…" from OK until the check starts. */
+        /** The Updates row's value (design A3): what the last check found, or "Checking…" from OK until it's done. */
         private String updatesValue() {
-            return checkAsked() ? Ui.tr("Checking…") : Updates.summary(updates, installed);
+            String st = updates.optString("state");
+            return checkAsked() || checking() ? Ui.tr("Checking…")
+                    : updateReady ? Ui.trf("{v} available · OK to view", "v", updates.optString("version"))
+                    : Updates.CURRENT.equals(st) ? Ui.tr("Up to date")
+                    : Updates.ERROR.equals(st) ? Ui.tr("Couldn't check · OK to retry") : Ui.tr("OK to check");
         }
 
-        /** A check or an install on its way or under way: poll reads the file more often. */
+        /** A check on its way or under way: poll reads the file more often. */
         private boolean updating() {
-            return Updates.busy(updates) || System.currentTimeMillis() - Math.max(checkAskedAt, installAskedAt) < 10_000;
+            return checking() || System.currentTimeMillis() - checkAskedAt < 10_000;
+        }
+
+        // MARK: - Google notifications (the Control Center's section)
+
+        private String alertsBusy = "";
+
+        private String alertsValue() {
+            return !GoogleAlerts.supported(getContext()) ? Ui.tr("Not available on this TV")
+                    : !alertsBusy.isEmpty() ? alertsBusy : onOff(alertsOn);
+        }
+
+        /** On or off in place: the system's notification access, through the TV's ADB. */
+        private void alertsNow() {
+            Context c = getContext();
+            if (!GoogleAlerts.supported(c) || !alertsBusy.isEmpty()) return;
+            boolean on = !alertsOn;
+            alertsBusy = on ? Ui.tr("Turning on…") : Ui.tr("Turning off…");
+            invalidate();
+            GoogleAlerts.set(c, on, problem -> {
+                alertsBusy = "";
+                alertsOn = GoogleAlerts.on(getContext());
+                if (problem != null) android.widget.Toast.makeText(getContext(), problem, android.widget.Toast.LENGTH_LONG).show();
+                invalidate();
+                spoken.focusMoved();
+            });
         }
 
         // MARK: - TMDB key (from a phone through KeyPage's QR code, or typed with the remote)
@@ -2374,8 +2414,9 @@ public class SettingsActivity extends Activity {
                     : screen == HOME_SETTINGS && from + focus == POWER_ON_ROW && unavailable(focus) == null
                     ? Ui.tr("Only after a full start, not from standby.")
                     : screen == HOME_SETTINGS && (from + focus == keyRow() || from + focus == watchmodeRow()) ? Ui.tr("OK: send it from your phone, or type it.")
-                    : screen == HOME_SETTINGS && from + focus == updatesRow() ? (Updates.ready(updates, installed)
-                    ? Ui.tr("OK installs it; Android asks first.") : Ui.tr("OK checks for a new version."))
+                    : screen == HOME_SETTINGS && from + focus == updatesRow() ? (updateReady
+                    ? Ui.tr("OK shows what's new. Nothing installs until you choose Install.") : Ui.tr("OK checks for a new version."))
+                    : screen == HOME_SETTINGS && from + focus == alertsRow() ? Ui.tr("Notifications from Google apps, in the Control Center.")
                     : Ui.tr("OK or the arrows change the value.")), LIST_X * k + 30 * k, hy, hint);
             if (keys) {
                 c.drawText(RemoteKeys.VESTEL ? Ui.tr("YouTube, Prime Video and Google Play: the TV itself controls those buttons.")
@@ -2452,6 +2493,9 @@ public class SettingsActivity extends Activity {
                 return;
             } else if (screen == HOME_SETTINGS && pickScroll + focus == updatesRow()) {
                 updateNow();
+                return;
+            } else if (screen == HOME_SETTINGS && pickScroll + focus == alertsRow()) {
+                alertsNow();
                 return;
             } else if (screen == HOME_SETTINGS && (pickScroll + focus == keyRow() || pickScroll + focus == watchmodeRow())) {
                 openKeyScreen(pickScroll + focus == watchmodeRow());

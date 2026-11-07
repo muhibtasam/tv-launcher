@@ -217,11 +217,11 @@ TizenBrew Installer takes the first `.wgt` of the latest GitHub release, so ever
 with a Tizen certificate (`--sign`), which 2017-2022 TVs install as it is; on 2023+ TVs the installer signs it again
 with the person's Samsung certificate. Sign every release with the same author certificate: older TVs refuse an
 update signed by another. `python3 webos/build.py --generic` makes the LG `.ipk` that goes along.
-The release's `FreeMyTV.apk` updates itself (`Updates`: a weekly job, and Home Settings > Updates): it reads
-`releases/latest`, so keep the asset named `FreeMyTV.apk`, sign it with the project's key, and raise `versionName`
-(compared number by number with the tag, `v1.3.0` > `1.2`) and `versionCode` (Android refuses a lower one). Before
-uploading, `apksigner verify --print-certs FreeMyTV.apk` must show the release certificate
-(`b85d4ff69cb42bfb1837ee0279506363954470b16402a4165f2f095886d19204`, `Updates.RELEASE_CERT`): TVs refuse any other. Then
+The release's `FreeMyTV.apk` updates itself, never silently (`Updates` + `UpdateLogic`, Ibtzy's Feature 2.2): a daily
+job (ModeJob "update") and Home Settings > Updates read `muhibtasam/tv-launcher`'s `releases/latest` (the repo must be
+public for TVs to read it), download and check the APK (GitHub's size and SHA-256, a higher `versionCode`, this package,
+signed with the same key as the installed app), then the home screen's update sheet asks: Install / Later. Keep the
+asset named `FreeMyTV.apk`, sign every release with the same keystore, and raise `versionName` and `versionCode`. Then
 `python3 tools/homebrew_repo.py <the uploaded FreeMyTV-webos.ipk>` writes `docs/webos/apps.json`, the webOS Homebrew
 Channel repository (https://freemytv.io/webos/apps.json, with that file's SHA-256), and a copy of the `.ipk` beside it:
 commit both with the release. The Channel installs from freemytv.io, not from the GitHub release, because GitHub's

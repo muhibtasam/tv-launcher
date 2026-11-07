@@ -309,6 +309,25 @@
             </intent-filter>
         </service>
 
+        <!-- Google apps' notifications for the Control Center (GoogleAlerts), with the home screen. Access is given
+             through the TV's ADB (cmd notification allow_listener): Google TV has no screen for it. -->
+        <service
+            android:name=".GoogleAlerts"
+            android:process=":home"
+            android:exported="true"
+            android:label="Free My TV"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Android's installer's answer for an update (UpdateReceiver): asks the person, never installs by itself. -->
+        <receiver
+            android:name=".UpdateReceiver"
+            android:process=":home"
+            android:exported="false" />
+
         <receiver
             android:name=".HomeReceiver"
             android:exported="false">

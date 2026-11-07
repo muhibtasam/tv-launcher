@@ -15,6 +15,20 @@ Open source. Built with Claude Code. One button to undo.
 
 </div>
 
+> **TV launcher (working name)** — this repository is a fork of [Free My TV](https://github.com/simbasjungles/free-my-tv)
+> with the look of ibtzy TV Launcher on Google TV and Android TV: ibtzy's home screen, tabs (Home, Movies, Apps;
+> Games off until turned on in *Settings* → *Tabs*), Control Center, screensaver and settings, over Free My TV's mode
+> switch, watchdog and one-button undo. What it adds on Google TV and Android TV:
+>
+> - **Updates that always ask.** A daily check of [this repository's releases](https://github.com/muhibtasam/tv-launcher/releases/latest);
+>   when one is ready, a sheet shows the version, its size and date and what's new, with *Install* and *Later*. Nothing
+>   installs by itself, and Android's installer asks again.
+> - **Google notifications** in the Control Center, with an orange dot on its button while some are unread
+>   (*Home Settings* → *Google notifications*).
+> - **Continue Watching** you can tidy: hold OK on a card to remove it; it comes back after you watch it again.
+>
+> LG and Samsung builds are Free My TV's, unchanged. The name will change later.
+
 ## What you get
 
 - **No ads.** No sponsored rows, banners or autoplaying promos. Not one.
@@ -48,7 +62,7 @@ About ten minutes. You need a Google TV or Android TV (Android 8 or newer) and a
 
 ### The ready APK
 
-No tools to install besides adb. The APK on the [latest release](https://github.com/simbasjungles/free-my-tv/releases/latest) has no TMDB key: add yours on the TV for the picks (*Home Settings* → *TMDB key*, [below](#the-tmdb-key)). It takes your city from the TV's time zone (change it in *Home Settings* → *City*).
+No tools to install besides adb. The APK on the [latest release](https://github.com/muhibtasam/tv-launcher/releases/latest) has no TMDB key: add yours on the TV for the picks (*Home Settings* → *TMDB key*, [below](#the-tmdb-key)). It takes your city from the TV's time zone (change it in *Home Settings* → *City*).
 
 If you built Free My TV yourself before, switch back to *Original* and uninstall it first: your build and the release are signed with different keys.
 
@@ -70,7 +84,7 @@ If you built Free My TV yourself before, switch back to *Original* and uninstall
 
 For the picks, add your TMDB key in *Home Settings* → *TMDB key* (below).
 
-**Updates come to the TV.** Once a week the APK from the release looks for a newer release and downloads it; the home screen then says so once, and *Home Settings* → *Updates* (the last row) installs it through Android's installer, which asks first (and, the first time, asks to allow Free My TV to install apps). OK on *Updates* also checks right away. The download must come from this repository's releases, match the size and SHA-256 GitHub lists, be newer, and be signed with the project's key. A build you made yourself checks only when you press *Updates*, and only says when a new version is out: build it again to update.
+**Updates come to the TV, and always ask.** Once a day the app looks at this repository's latest release and, when it's newer, downloads it and checks it: it must come from this repository's releases, match the size and SHA-256 GitHub lists, have a higher version, and be signed with the same key as the app you have. The home screen then shows the update sheet once (the version, its size and date, what's new, *Install* and *Later*); *Home Settings* → *Updates* shows it again, or checks right away. *Install* hands it to Android's installer, which asks first (and, the first time, asks to allow the app to install apps). Nothing ever installs by itself.
 
 ### The manual way
 

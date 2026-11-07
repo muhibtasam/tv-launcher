@@ -177,7 +177,8 @@ public class HomeActivity extends Activity {
             return;
         }
         if (home != null) home.resume();
-        Updates.tellOnce(this);   // an update the week's check got ready: said once
+        home.postDelayed(() -> Updates.schedule(this), 15_000);   // the daily update check (once), after start-up
+        home.postDelayed(() -> HomeMode.ensureAutoStartSoon(this), 20_000);   // TCL: this app's jobs may run
     }
 
     @Override protected void onPause() {
@@ -191,12 +192,13 @@ public class HomeActivity extends Activity {
 
     /** Home button pressed: back to the entry state (the Home tab, focus on it; drawer, sheet and Control center closed). */
     /** Opens All Apps (a remote's All Apps button, RemoteKeys). */
-    static final String EXTRA_ALL_APPS = "io.freemytv.ALL_APPS";
+    static final String EXTRA_ALL_APPS = "io.freemytv.ALL_APPS", EXTRA_UPDATE = "io.freemytv.UPDATE";
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (home == null) return;
         if (intent.getBooleanExtra(EXTRA_ALL_APPS, false)) home.showAllApps();
+        if (home != null && intent.getBooleanExtra(EXTRA_UPDATE, false)) home.showUpdateNow();   // Settings › Updates
         else home.reset(true);
     }
 

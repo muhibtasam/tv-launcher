@@ -20,6 +20,58 @@ public final class ControlCenterNav {
      * {panel left, panel top, panel right, panel bottom, the LAUNCHER heading's baseline}.
      */
     public static float[] layout(float k, float contentR, float[][] tiles) {
+        return layout(k, contentR, tiles, 0, false);
+    }
+
+    // The Google section (alerts) under TV settings: a heading as LAUNCHER's, rows, and the "See all · Clear all" footer.
+    // With it the panel reaches down to above the dock (884) and its content scrolls; without it nothing changes.
+    public static final float ALERT_H = 72, FOOTER_H = 64, MAX_BOTTOM = 884;
+
+    /**
+     * As layout(k, contentR, tiles), plus `alerts` rows and, with `footer`, its footer: their places go in
+     * tiles[COUNT ..] (rows, then the footer). Returns {panel left, panel top, panel right, panel bottom (what's shown),
+     * the LAUNCHER heading's baseline, the GOOGLE heading's baseline (0 without alerts), the content's bottom (with the
+     * panel's padding: past the panel's bottom when it scrolls)}.
+     */
+    public static float[] layout(float k, float contentR, float[][] tiles, int alerts, boolean footer) {
+        float[] p = tiles(k, contentR, tiles);
+        if (alerts <= 0 && !footer) return new float[] {p[0], p[1], p[2], p[3], p[4], 0, p[3]};
+        float pad = PAD * k, gap = GAP * k, x0 = p[0] + pad, x1 = p[2] - pad;
+        float y = tiles[ALL][B] + 30 * k;
+        float headingY = y + 16 * k;   // "GOOGLE · 3 NEW", as "LAUNCHER"
+        y += 34 * k;
+        int at = COUNT;
+        for (int i = 0; i < alerts; i++, at++) {
+            set(tiles[at], x0, y, x1, y + ALERT_H * k);
+            y += ALERT_H * k + gap;
+        }
+        if (footer) {
+            set(tiles[at], x0, y, x1, y + FOOTER_H * k);
+            y += FOOTER_H * k + gap;
+        }
+        float contentBottom = y - gap + pad;
+        return new float[] {p[0], p[1], p[2], Math.min(contentBottom, MAX_BOTTOM * k), p[4], headingY, contentBottom};
+    }
+
+    /** How far the content can scroll (0 when it fits). `p`: layout's result. */
+    public static float maxScroll(float[] p) {
+        return Math.max(0, p[6] - p[3]);
+    }
+
+    /**
+     * The scroll that keeps tile `focus` inside the panel with `margin` to spare, moving as little as possible from
+     * `current`; the top two rows (Wi-Fi to Turn off) bring the panel back to its top, title included.
+     */
+    public static float scrollFor(float[][] tiles, int focus, float[] p, float current, float margin) {
+        float max = maxScroll(p);
+        if (max <= 0 || focus < 0 || focus >= tiles.length || tiles[focus][T] <= tiles[AIRPLAY][T]) return 0;
+        float s = Math.max(0, Math.min(max, current));
+        if (tiles[focus][T] - margin < p[1] + s) s = tiles[focus][T] - margin - p[1];
+        if (tiles[focus][B] + margin > p[3] + s) s = tiles[focus][B] + margin - p[3];
+        return Math.max(0, Math.min(max, s));
+    }
+
+    private static float[] tiles(float k, float contentR, float[][] tiles) {
         float pad = PAD * k, gap = GAP * k, w = W * k;
         float right = contentR * k, left = right - w, x0 = left + pad, x1 = right - pad, half = (x1 - x0 - gap) / 2;
         float y = TOP * k + pad + 62 * k;   // under the title

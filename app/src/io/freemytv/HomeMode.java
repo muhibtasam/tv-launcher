@@ -292,7 +292,43 @@ final class HomeMode {
     static long request(Context c, String mode) {
         // Back to Free My TV before Original's revoke ran: it would stop the app mid-switch, and isn't wanted any more.
         if (FREE.equals(mode)) ModeJob.cancel(c, ModeJob.REVOKE_WATCH);
-        return ModeJob.schedule(c, ModeJob.APPLY, mode, 0);
+        // TCL's app manager (TclAppBoot) refuses this app's jobs without its auto-start permission, and the switch
+        // runs as a job: that permission first (in this process, which is in front), then the job.
+        final Context app = c.getApplicationContext();
+        final long at = SystemClock.elapsedRealtime();
+        new Thread(() -> {
+            ensureAutoStart(app, 3_000);
+            ModeJob.schedule(app, ModeJob.APPLY, mode, 0, at);
+        }, "free-my-tv-request").start();
+        return at;
+    }
+
+    private static volatile boolean autoStartChecked;
+
+    /**
+     * TCL TVs (TclAppBoot): without "auto start" (appop AUTO_START) this app's jobs and services are refused, so the
+     * mode switch, the update check and the remote buttons' service never run; an app update can take it away. Allowed
+     * again through the TV's ADB, as the other grants. Elsewhere there's no such op and nothing is done. Blocking.
+     */
+    static void ensureAutoStart(Context c, int timeoutMs) {
+        try (Adb adb = Adb.connect(c, timeoutMs, null)) {
+            String now = adb.shell("appops get " + PKG + " AUTO_START").trim();
+            if (!now.startsWith("AUTO_START:") || now.startsWith("AUTO_START: allow")) return;   // not a TCL op, or allowed
+            adb.shell("appops set " + PKG + " AUTO_START allow");
+            AppLog.w("auto start: was \"" + now + "\", allowed");
+        } catch (Exception e) {
+            AppLog.w("auto start: not checked (" + e.getMessage() + ")");
+        }
+    }
+
+    /** Once per home process, in Free My TV mode (where the TV's ADB is already allowed): keep auto start on. */
+    static void ensureAutoStartSoon(Context c) {
+        if (autoStartChecked) return;
+        autoStartChecked = true;
+        final Context app = c.getApplicationContext();
+        HomeView.LOADER.execute(() -> {
+            if (FREE.equals(state(app).optString("mode"))) ensureAutoStart(app, 10_000);
+        });
     }
 
     /** Our home screen crashed 3 times in 5 minutes: give the home screen back to the TV's own (asked by :home). */

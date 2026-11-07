@@ -85,14 +85,26 @@ final class ControlCenter {
             CC_HOME_SETTINGS = ControlCenterNav.HOME_SETTINGS, CC_CLEAR = ControlCenterNav.CLEAR, CC_ALL = ControlCenterNav.ALL,
             CC_COUNT = ControlCenterNav.COUNT;
     private static final float CC_PAD = ControlCenterNav.PAD;
-    private final float[][] ccTiles = new float[CC_COUNT][4];   // {left, top, right, bottom}, for the arrows
+    // The Google section (design C2): up to 2 rows and the footer ("See all · Clear all"), or all of them (20 at most)
+    // once See all is chosen; none at all without alerts (the panel is then exactly as before).
+    private static final int ALERTS_SHORT = 2, ALERTS_ALL = 20, CC_MAX = CC_COUNT + ALERTS_ALL + 1;
+    private float[][] ccTiles = new float[CC_COUNT][4];   // {left, top, right, bottom}, for the arrows: exactly the tiles shown
     boolean ccOpen, ccOkDown, ccBackDown;
     private int ccIndex;
     private final Spring ccShow = new Spring(0.3f, 1f, 0);   // the panel's fade and scale (Explore's springs, faster)
-    private final Spring[] ccFocus = new Spring[CC_COUNT];
-    private final RectF[] ccRects = new RectF[CC_COUNT];
+    private final Spring ccScroll = new Spring(0.3f, 1f, 0);   // the content's scroll (only with alerts)
+    private final Spring[] ccFocus = new Spring[CC_MAX];
+    private final RectF[] ccRects = new RectF[CC_MAX];
     private final RectF ccPanel = new RectF();
-    private float ccSectionY;
+    private float ccSectionY, ccAlertsY;
+    private float[] ccLayout = new float[7];
+    private List<AlertsLogic.Alert> ccAlerts = new ArrayList<>();
+    private int ccShown;            // alert rows shown (tiles COUNT .. COUNT + ccShown - 1), then the footer
+    private boolean ccExpanded;     // See all chosen
+    private final Map<String, Bitmap> alertIcons = new HashMap<>();
+    private final Map<String, String> alertNames = new HashMap<>();
+    private final Path ccClip = new Path();
+    private Paint ccRowName, ccRowText;
     private int ccWifi = Radios.UNKNOWN, ccBt = Radios.UNKNOWN, ccVolume, ccVolumeMax = 1;
     private String ccAirplayPkg, ccAirplayName;
     private Intent ccAirplayIntent;          // the TV's own AirPlay screen (or receiver app), found once
@@ -103,13 +115,16 @@ final class ControlCenter {
 
     void openCC() {
         if (ccOpen) return;
-        if (ccFocus[0] == null) for (int i = 0; i < CC_COUNT; i++) {
+        if (ccFocus[0] == null) for (int i = 0; i < CC_MAX; i++) {
             ccFocus[i] = new Spring(0.24f, 0.9f, 0);
             ccRects[i] = new RectF();
         }
         ccOpen = true;
         ccIndex = CC_WIFI;
-        for (int i = 0; i < CC_COUNT; i++) ccFocus[i].snap(i == ccIndex ? 1 : 0);
+        ccExpanded = false;
+        ccScroll.snap(0);
+        refreshAlerts();
+        for (int i = 0; i < CC_MAX; i++) ccFocus[i].snap(i == ccIndex ? 1 : 0);
         ccOkDown = ccBackDown = false;
         readCCState();
         findAirplay();
@@ -280,11 +295,64 @@ final class ControlCenter {
         }
     }
 
-    private void layoutCC() {
-        float[] p = ControlCenterNav.layout(home.k, home.CONTENT_R, ccTiles);
-        for (int i = 0; i < CC_COUNT; i++) ccRects[i].set(ccTiles[i][0], ccTiles[i][1], ccTiles[i][2], ccTiles[i][3]);
+    // MARK: - The Google section
+
+    /** The alerts as they are now (GoogleAlerts), their apps' icons and names loaded off the main thread. */
+    private void refreshAlerts() {
+        ccAlerts = GoogleAlerts.visible(home.getContext(), ALERTS_ALL);
+        ccShown = ccExpanded ? ccAlerts.size() : Math.min(ALERTS_SHORT, ccAlerts.size());
+        int count = tileCount();
+        if (ccTiles.length != count) ccTiles = new float[count][4];
+        if (ccIndex >= count) ccIndex = count - 1;
+        final Context app = home.getContext().getApplicationContext();
+        for (AlertsLogic.Alert a : ccAlerts) {
+            final String pkg = a.pkg;
+            if (alertNames.containsKey(pkg)) continue;
+            alertNames.put(pkg, "");
+            home.LOADER.execute(() -> {
+                Bitmap icon = HomeApps.dockIcon(app, pkg);
+                String name;
+                try {
+                    PackageManager pm = app.getPackageManager();
+                    name = String.valueOf(pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)));
+                } catch (Exception e) {
+                    name = "Google";
+                }
+                final String n = name;
+                home.handler.post(() -> {
+                    if (icon != null) alertIcons.put(pkg, icon);
+                    alertNames.put(pkg, n);
+                    if (ccOpen) home.ccLayer.invalidate();
+                });
+            });
+        }
+    }
+
+    private int tileCount() {
+        return CC_COUNT + ccShown + (ccAlerts.isEmpty() ? 0 : 1);
+    }
+
+    private int footerIndex() {
+        return ccAlerts.isEmpty() ? -1 : CC_COUNT + ccShown;
+    }
+
+    /** The list changed while the panel is open (HomeView): laid out again, the focus kept on a tile that exists. */
+    void alertsChanged() {
+        if (!ccOpen) return;
+        refreshAlerts();
+        ccScroll.target = ControlCenterNav.scrollFor(ccTiles, ccIndex, layoutCC(), ccScroll.target, 32 * home.k);
+        home.ccLayer.invalidate();
+        home.wake();
+    }
+
+    private float[] layoutCC() {
+        float[] p = ControlCenterNav.layout(home.k, home.CONTENT_R, ccTiles, ccShown, !ccAlerts.isEmpty());
+        for (int i = 0; i < ccTiles.length; i++) ccRects[i].set(ccTiles[i][0], ccTiles[i][1], ccTiles[i][2], ccTiles[i][3]);
         ccSectionY = p[4];   // "LAUNCHER"
+        ccAlertsY = p[5];    // "GOOGLE · 2 NEW"
         ccPanel.set(p[0], p[1], p[2], p[3]);
+        ccLayout = p;
+        return p;
     }
 
     /** One frame: the panel's fade and scale (a layer property, no redraw) and the focus (redrawn while it moves). */
@@ -301,8 +369,8 @@ final class ControlCenter {
             home.ccLayer.setScaleY(sc);
         }
         if (!ccOpen && v <= 0.002f && home.ccLayer.getVisibility() != home.GONE) home.ccLayer.setVisibility(home.GONE);
-        boolean focus = false;
-        for (int i = 0; i < CC_COUNT; i++) {
+        boolean focus = ccScroll.step(dt);
+        for (int i = 0; i < CC_MAX; i++) {
             ccFocus[i].target = ccOpen && i == ccIndex ? 1 : 0;
             focus |= ccFocus[i].step(dt);
         }
@@ -376,11 +444,43 @@ final class ControlCenter {
         int best = ControlCenterNav.move(ccTiles, ccIndex, dx, dy);
         if (best < 0) return;
         ccIndex = best;
+        ccScroll.target = ControlCenterNav.scrollFor(ccTiles, ccIndex, ccLayout, ccScroll.target, 32 * home.k);
+        if (ccIndex >= CC_COUNT && GoogleAlerts.unread(home.getContext())) {
+            GoogleAlerts.markSeen(home.getContext());   // the list is seen: the orange dot goes
+            home.alertsChanged();
+        }
         home.click.move();
         home.wake();
     }
 
     private void ccActivate(int i) {
+        if (i >= CC_COUNT && i == footerIndex()) {
+            if (!ccExpanded && ccAlerts.size() > ccShown) {   // See all: every alert, in place; the focus stays on the footer
+                ccExpanded = true;
+                refreshAlerts();
+                ccIndex = footerIndex();
+            } else {                                          // Clear all: the section goes, the panel is as before
+                GoogleAlerts.clearAll(home.getContext());
+                ccExpanded = false;
+                ccIndex = CC_ALL;
+                refreshAlerts();
+                home.showToast(Ui.tr("Notifications cleared."));
+            }
+            ccScroll.target = ControlCenterNav.scrollFor(ccTiles, ccIndex, layoutCC(), ccScroll.target, 32 * home.k);
+            home.alertsChanged();
+            home.ccLayer.invalidate();
+            return;
+        }
+        if (i >= CC_COUNT && i - CC_COUNT < ccAlerts.size()) {   // an alert: what it opens, over the home screen
+            AlertsLogic.Alert a = ccAlerts.get(i - CC_COUNT);
+            closeCC(true);
+            if (!GoogleAlerts.open(home.getContext(), a)) {
+                String name = alertNames.get(a.pkg);
+                home.showToast(Ui.trf("Couldn't open {app}.", "app", name == null || name.isEmpty() ? "Google" : name));
+            }
+            home.alertsChanged();
+            return;
+        }
         switch (i) {
             case CC_WIFI:
                 ccOpenItem(HomeApps.action(HomeApps.WIFI, HomeApps.TOP_WIFI, Ui.tr("Wi-Fi"), "wifi"));
@@ -484,7 +584,8 @@ final class ControlCenter {
     /** Opens a settings page or an app from a tile: the panel goes at once (the page opens over Home). */
     private void ccOpenItem(HomeApps.Item it) {
         RectF r = ccRects[ccIndex];
-        boolean opened = HomeApps.open(home.activity, it, home, Math.round(r.left), Math.round(r.top),
+        float dy = Ui.clamp(ccShow.value) > 0 ? ccScroll.value : 0;   // where the tile is on screen (the content may be scrolled)
+        boolean opened = HomeApps.open(home.activity, it, home, Math.round(r.left), Math.round(r.top - dy),
                 Math.round(r.width()), Math.round(r.height()));
         if (opened) closeCC(true);
         else home.showToast(Ui.trf("Couldn't open {app}.", "app", it.label));
@@ -519,6 +620,45 @@ final class ControlCenter {
         home.drawFlatGlass(c, ccPanel, radius);
         // No white wash or outline on top: the glass's own light-catching edge is its outline (glass over glass
         // looked like a transparent panel with a white border).
+        // With alerts the content can be taller than the panel: it scrolls inside it (clipped to its rounded shape).
+        float scroll = ControlCenterNav.maxScroll(ccLayout) > 0 ? ccScroll.value : 0;
+        c.save();
+        if (!ccAlerts.isEmpty()) {
+            ccClip.reset();
+            ccClip.addRoundRect(ccPanel, radius, radius, Path.Direction.CW);
+            c.clipPath(ccClip);
+            c.translate(0, -scroll);
+        }
+        drawCCContent(c);
+        c.restore();
+        if (scroll > 0.5f) drawCCFade(c, ccPanel.top, true);
+        if (ControlCenterNav.maxScroll(ccLayout) - scroll > 0.5f) drawCCFade(c, ccPanel.bottom, false);
+    }
+
+    /** The panel's colour fading over the content where it scrolls past an edge (as design C2's top fade). */
+    private LinearGradient fadeTop, fadeBottom;
+    private float fadeTopAt = -1, fadeBottomAt = -1;
+
+    private void drawCCFade(Canvas c, float edge, boolean top) {
+        float k = home.k, h = 96 * k;
+        home.tmp.set(ccPanel.left, top ? edge : edge - h, ccPanel.right, top ? edge + h : edge);
+        // Made once per panel size (not on every frame of a scroll).
+        if (top && (fadeTop == null || fadeTopAt != edge)) {
+            fadeTop = new LinearGradient(0, home.tmp.top, 0, home.tmp.bottom, 0xFF161214, 0x00161214, Shader.TileMode.CLAMP);
+            fadeTopAt = edge;
+        } else if (!top && (fadeBottom == null || fadeBottomAt != edge)) {
+            fadeBottom = new LinearGradient(0, home.tmp.top, 0, home.tmp.bottom, 0x00161214, 0xFF161214, Shader.TileMode.CLAMP);
+            fadeBottomAt = edge;
+        }
+        home.fill.setShader(top ? fadeTop : fadeBottom);
+        c.save();
+        c.clipPath(ccClip);
+        c.drawRect(home.tmp, home.fill);
+        c.restore();
+        home.fill.setShader(null);
+    }
+
+    private void drawCCContent(Canvas c) {
         float tb = ccPanel.top + CC_PAD * home.k + Ui.halfCap(ccTitle) * 2;   // "Control center": the launcher's serif headings
         c.drawText(Ui.tr("Control") + " ", ccPanel.left + CC_PAD * home.k, tb, ccTitle);
         c.drawText(Ui.tr("center"), ccPanel.left + CC_PAD * home.k + ccTitle.measureText(Ui.tr("Control") + " "), tb, ccTitleIt);
@@ -540,6 +680,91 @@ final class ControlCenter {
         drawCCTile(c, CC_HOME_SETTINGS, "home", Ui.tr("Launcher"), null, false, false);
         drawCCTile(c, CC_CLEAR, "delete", Ui.tr("Clear history"), null, false, false);
         drawCCTile(c, CC_ALL, "settings", Ui.tr("TV settings"), null, false, false);
+        if (!ccAlerts.isEmpty()) drawAlerts(c);
+    }
+
+    /** "GOOGLE · 2 NEW", the alert rows (the app's round icon, its name, the line) and the footer. */
+    private void drawAlerts(Canvas c) {
+        float k = home.k;
+        if (ccRowName == null) {
+            ccRowName = Ui.text(Ui.semibold, 21 * k, 0xFFF3EDE2);
+            ccRowText = Ui.text(Ui.medium, 21 * k, 0xFFF3EDE2);
+        }
+        int unread = GoogleAlerts.unreadCount(home.getContext());
+        String heading = unread > 0 ? Ui.trf("GOOGLE · {n} NEW", "n", unread) : Ui.trf("GOOGLE · {n}", "n", ccAlerts.size());
+        ccSection.setColor(0xFFFFB27A);
+        c.drawText(heading, ccPanel.left + CC_PAD * k + 4 * k, ccAlertsY, ccSection);
+        for (int i = 0; i < ccShown; i++) drawAlertRow(c, CC_COUNT + i, ccAlerts.get(i));
+        int foot = footerIndex();
+        boolean seeAll = !ccExpanded && ccAlerts.size() > ccShown;
+        drawCCRowBase(c, foot);
+        float f = Ui.clamp(ccFocus[foot].value);
+        int ink = home.blend(0xFFF3EDE2, 0xFF1A1614, f);
+        RectF r = home.cell;
+        float base = r.centerY() + Ui.halfCap(ccRowName);
+        ccRowName.setColor(ink);
+        c.drawText(seeAll ? Ui.tr("See all · Clear all") : Ui.tr("Clear all"), r.left + 22 * k, base, ccRowName);
+        String n = String.valueOf(ccAlerts.size());
+        ccRowText.setColor(Ui.alpha(ink, 0.6f));
+        c.drawText(n, r.right - 22 * k - ccRowText.measureText(n), base, ccRowText);
+    }
+
+    private void drawAlertRow(Canvas c, int i, AlertsLogic.Alert a) {
+        float k = home.k;
+        drawCCRowBase(c, i);
+        RectF r = home.cell;
+        float f = Ui.clamp(ccFocus[i].value), d = 44 * k;
+        int ink = home.blend(0xFFF3EDE2, 0xFF1A1614, f);
+        float x = r.left + 18 * k;
+        Bitmap icon = alertIcons.get(a.pkg);
+        if (icon != null) {
+            home.drawRoundIcon(c, icon, x, r.centerY() - d / 2, d);
+        } else {   // until its icon is read: a quiet round disc in its place
+            home.fill.setShader(null);
+            home.fill.setColor(home.blend(0x29F3EDE2, 0x331A1614, f));
+            c.drawCircle(x + d / 2, r.centerY(), d / 2, home.fill);
+        }
+        x += d + 14 * k;
+        float room = r.right - 22 * k - x;
+        String name = alertNames.get(a.pkg);
+        if (name == null || name.isEmpty()) name = "Google";
+        ccRowName.setColor(ink);
+        ccRowText.setColor(ink);
+        float base = r.centerY() + Ui.halfCap(ccRowText);
+        // One line, inside the row: the app's name, then the alert, cut with "…" where it would run out of room.
+        home.fitPaint.set(ccRowName);
+        String shownName = TextUtils.ellipsize(name, home.fitPaint, room * 0.5f, TextUtils.TruncateAt.END).toString();
+        c.drawText(shownName, x, base, ccRowName);
+        float nx = x + ccRowName.measureText(shownName + " ");
+        home.fitPaint.set(ccRowText);
+        String line = "· " + AlertsLogic.line(a);
+        c.drawText(TextUtils.ellipsize(line, home.fitPaint, Math.max(0, r.right - 22 * k - nx), TextUtils.TruncateAt.END).toString(),
+                nx, base, ccRowText);
+    }
+
+    /** A row's body as the tiles' (lighter glass, ivory and a ring when focused), without growing: rows are full width. */
+    private void drawCCRowBase(Canvas c, int i) {
+        float k = home.k, f = Ui.clamp(ccFocus[i].value);
+        home.cell.set(ccRects[i]);
+        float r = home.cell.height() * 0.3f;
+        home.fill.setShader(null);
+        home.fill.setColor(home.blend(0x0DF3EDE2, 0xFFF3EADB, f));
+        c.drawRoundRect(home.cell, r, r, home.fill);
+        home.border.setStrokeWidth(1 * k);
+        home.border.setColor(Ui.alpha(0xFFF3EDE2, 0.12f * (1 - f)));
+        c.drawRoundRect(home.cell, r, r, home.border);
+        home.border.setStrokeWidth(2 * k);
+        if (f > 0.01f) {
+            if (ccRing == null) {
+                ccRing = new Paint(Paint.ANTI_ALIAS_FLAG);
+                ccRing.setStyle(Paint.Style.STROKE);
+            }
+            ccRing.setStrokeWidth(3 * k);
+            ccRing.setColor(Ui.alpha(0xFFFFFFE0, f));
+            home.tmp.set(home.cell);
+            home.tmp.inset(-5.5f * k, -5.5f * k);
+            c.drawRoundRect(home.tmp, r + 5.5f * k, r + 5.5f * k, ccRing);
+        }
     }
 
     /**

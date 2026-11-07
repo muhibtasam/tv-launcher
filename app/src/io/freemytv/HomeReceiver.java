@@ -19,8 +19,6 @@ public class HomeReceiver extends BroadcastReceiver {
             HomeMode.ensureRemoteService(context, 3_000);
             Updates.schedule(context);
             later(() -> Updates.cleanUp(context));
-        } else if (Updates.ACTION.equals(action)) {
-            later(() -> Updates.status(context, intent));
         } else if (SleepTimer.ACTION.equals(action)) {
             long setAt = intent.getLongExtra("setAt", 0);
             later(() -> SleepTimer.fire(context, setAt));   // ADB is network

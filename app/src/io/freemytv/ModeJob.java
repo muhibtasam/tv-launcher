@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets;
  */
 public class ModeJob extends JobService {
     static final String APPLY = "apply", VERIFY = "verify", REVERT = "revert", MEMORY = "memory", REMOTE = "remote",
-            PLAYING = "playing", UPDATE = "update", INSTALL = "install", GRANT_WATCH = "watchGrant",
+            PLAYING = "playing", UPDATE = "update", GRANT_WATCH = "watchGrant",
             REVOKE_WATCH = "watchRevoke", POWER_ON = "powerOn";   // job ids come from these names: keep them apart
 
     @Override public boolean onStartJob(JobParameters params) {
@@ -32,7 +32,6 @@ public class ModeJob extends JobService {
         final Context app = getApplicationContext();
         new Thread(() -> {
             if (APPLY.equals(action)) noteStarted(app, at);
-            boolean again = false;   // the week's update check failed: the system tries again soon (Updates.schedule)
             try {
                 switch (action) {
                     case APPLY: HomeMode.applyNow(app, mode); break;
@@ -41,8 +40,7 @@ public class ModeJob extends JobService {
                     case MEMORY: HomeMode.measureMemoryNow(app, mode); break;
                     case REMOTE: HomeMode.ensureRemoteServiceNow(app); break;
                     case PLAYING: HomeMode.nowPlayingAccessNow(app); break;
-                    case UPDATE: again = Updates.check(app) && params.getJobId() == Updates.JOB; break;   // the week's, or OK
-                    case INSTALL: Updates.install(app); break;
+                    case UPDATE: Updates.checkNow(app); break;   // never installs: the update sheet asks first
                     case GRANT_WATCH: HomeMode.grantWatchNow(app); break;
                     case REVOKE_WATCH: HomeMode.revokeWatchNow(app); break;
                     case POWER_ON: HomeMode.powerOnNow(app); break;
@@ -51,7 +49,7 @@ public class ModeJob extends JobService {
             } catch (Throwable t) {
                 AppLog.w("job " + action + " failed: " + t);
             }
-            jobFinished(params, again);
+            jobFinished(params, false);
         }, "free-my-tv-" + action).start();
         return true;
     }
@@ -75,7 +73,10 @@ public class ModeJob extends JobService {
      * (elapsedRealtime, the same in every process), which a switch's job leaves behind once it runs ({@link #started}).
      */
     static long schedule(Context c, String action, String mode, long delayMs) {
-        long at = SystemClock.elapsedRealtime();
+        return schedule(c, action, mode, delayMs, SystemClock.elapsedRealtime());
+    }
+
+    static long schedule(Context c, String action, String mode, long delayMs, long at) {
         JobScheduler scheduler = c.getSystemService(JobScheduler.class);
         if (scheduler == null) return at;
         PersistableBundle extras = new PersistableBundle();
