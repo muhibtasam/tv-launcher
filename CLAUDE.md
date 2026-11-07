@@ -1,5 +1,28 @@
 # VYRO: notes for Claude
 
+**Start here:** [HANDOFF.md](HANDOFF.md) (state, TV, approval rules, build/release), [ARCHITECTURE.md](ARCHITECTURE.md)
+(processes, classes, data flow), [FEATURES.md](FEATURES.md) (what exists, where it came from, what was verified),
+[IBTZY_UI_PORT.md](IBTZY_UI_PORT.md) (step-by-step history). The rest of this file is Free My TV's guide, still true
+for the core (mode switch, safety rules, releases), with the name changed to VYRO.
+
+## VYRO in short
+
+- Fork of Free My TV with the owner's ibtzy TV Launcher design and features; package `io.vyro.tv`; repo
+  github.com/muhibtasam/vyro; releases are `build.sh --generic` (no keys), asset `VYRO.apk`, updates ask first.
+- The owner approves each commit, push, release and TV install; keys never leave `config.properties`.
+- `bash tools/check.sh` must pass before any push; add tests for pure logic in `tools/tests` (`*Logic` classes).
+- UI follows ibtzy's design language and the approved designs (links in HANDOFF.md); new designs need approval first.
+
+## Skills that fit this project
+
+- `tv-launcher-perf` — any change that touches drawing, focus, scrolling, images or memory on the TV.
+- `tdd` / `tdd-workflow` — new logic: test first in `tools/tests` (loading, error, empty, malformed data).
+- `verify` / `review` / `security-review` — before a release (keys, permissions, ADB use).
+- `android-permissions-security`, `anr-audit-and-fix`, `android-profiler` — permissions, main-thread work, memory.
+- Skip Compose/Gradle skills: this app is plain Java with a hand-written build.
+
+## Free My TV core
+
 A home screen for Google TV and Android TV that replaces the stock one, plus a settings app that switches between
 VYRO and the TV's original home screen. A plain Android app in Java, built without Gradle by `build.sh`.
 LG TVs (webOS) and Samsung TVs (Tizen) get the same home screen as a web app: `web/`, packed by `webos/` and `tizen/`

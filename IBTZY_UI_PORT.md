@@ -1,3 +1,5 @@
+> This is the history log of the port and the VYRO releases. Current state: [HANDOFF.md](HANDOFF.md).
+
 # Ibtzy UI port: handoff
 
 VYRO (this repo, `io.vyro.tv`) now draws Ibtzy TV Launcher's home screen. Ibtzy (`~/Codes/ibtzy-tv-launcher`)
