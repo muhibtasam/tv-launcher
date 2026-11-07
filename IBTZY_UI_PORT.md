@@ -214,10 +214,11 @@ serial worker; "Picks from" lookups are memoised per settings change (`Recs.hidd
 - Needs the owner's OK: `adb shell appops set io.freemytv AUTO_START allow` (an app-op, not a permission).
 
 ## Phase C — Feature 2.2 (updates, release, notifications) — 2026-11-07
-- Repo: github.com/muhibtasam/tv-launcher (private), `main` @ 806be8d = UI port. Phase C is uncommitted on top.
+- Repo: github.com/muhibtasam/tv-launcher (public since 2026-11-07), `main`: 806be8d UI port, 3b955d3 Phase C + README + WatchNext removal fix (stillHidden).
 - Updates: FMT's engine replaced by Ibtzy's ask-first one (Updates, UpdateLogic, UpdateSheet B1, UpdateReceiver); source `muhibtasam/tv-launcher`, asset `FreeMyTV.apk`, same-signer check (old RELEASE_CERT gone). ModeJob INSTALL removed.
 - Notifications: GoogleAlerts listener (:home) + AlertsLogic; Control Center section C2, unread dot on its button, empty state.
 - Settings (A3): Home Settings › Updates (value inline; ready → opens the sheet) and Google notifications (on/off through the TV's ADB) as the last two rows.
 - HomeMode: TCL AUTO_START ensured before the switch job and once per home process in Free My TV mode.
 - i18n: 29 new strings are English placeholders in every catalogue (no ANTHROPIC_API_KEY for `translate.py --fill`); obsolete update strings pruned.
 - Mac: build OK, tools/check.sh all passed, UpdateLogicTest + AlertsLogicTest pass. TV: not tested.
+- Upstream gap: baseline ≈ upstream main of 2026-10-31 (v1.3.0 + early fixes); ~60 upstream commits since (unreleased, no v1.4 yet) not ported.
