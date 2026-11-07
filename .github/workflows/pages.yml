@@ -4,7 +4,9 @@ name: Website
 on:
   push:
     branches: [main]
-    paths: ["docs/**", ".github/workflows/pages.yml"]
+    paths: ["docs/**", ".github/workflows/pages.yml", "tools/netflix_top10.py"]
+  schedule:
+    - cron: "17 6 * * 3"   # Wednesdays: Netflix's Top 10 for the week ending Sunday is out on Tuesday
   workflow_dispatch:
 
 permissions:
@@ -24,6 +26,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
+      - name: Netflix Top 10 for Home (NetflixLogic; a failed read leaves it out, the app keeps its last list)
+        continue-on-error: true
+        run: python3 tools/netflix_top10.py docs/netflix-top10.tsv
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

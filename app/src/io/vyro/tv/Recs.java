@@ -60,6 +60,7 @@ final class Recs {
         int season;             // shows: the season airing now or last aired (0 = unknown)
         String seasonName = ""; // that season's own name, when it has one beyond "Season 3"
         String want;            // fetched for this service (Explore's per-service picks): preferred when it streams there
+        int top10;              // Netflix's Top 10 place (1..10) on Home's Netflix tiles, 0 = none
         int label;              // What's New: ArrivalsLogic.NEW_ON / PREMIERE / NEW_SEASON / NEW_EPISODE, or NONE (no chip)
         String labelApp;        // NEW_ON: the service it was found on
         double rating;          // TMDB's average (0-10), shown only with enough votes
@@ -392,7 +393,171 @@ final class Recs {
             if (out.size() >= max) break;
             if (p.pkg != null && have.computeIfAbsent(p.pkg, this::installed)) out.add(p);
         }
+        List<Pick> netflix = netflixShown();   // 4 Netflix tiles spread through the grid (NETFLIX_SLOTS)
+        for (int i = 0; i < netflix.size() && i < NETFLIX_SLOTS.length; i++) {
+            Pick p = netflix.get(i);
+            if (p != null && have.computeIfAbsent(p.pkg, this::installed)) out.add(Math.min(NETFLIX_SLOTS[i], out.size()), p);
+        }
+        while (out.size() > max) out.remove(out.size() - 1);
         return out;
+    }
+
+    // MARK: - Netflix on Home (NetflixLogic)
+    // Netflix publishes nothing to other launchers, so its tiles come from its public Top 10 (this project's site,
+    // refreshed weekly by pages.yml: tools/netflix_top10.py) and TMDB's titles on Netflix here, newest first. A pool of
+    // up to 5 movies, 5 shows and 5 new titles; Home shows 4 (NetflixLogic.pick), spread through the grid.
+
+    static final String NETFLIX_TOP10 = "https://muhibtasam.github.io/vyro/netflix-top10.tsv";
+    private static final long NETFLIX_EVERY = 12 * 3600_000L, NETFLIX_RETRY = 30 * 60_000L;
+    private static final int[] NETFLIX_SLOTS = {0, 3, 6, 9};
+    private static final int NETFLIX_PROVIDER = 8;   // TMDB's id for Netflix
+    private final ExecutorService netflixIo = lowPriority(1);
+    private final java.util.concurrent.atomic.AtomicBoolean netflixRunning = new java.util.concurrent.atomic.AtomicBoolean();
+    private volatile List<Pick> netflixPool;   // null: not read from the cache yet
+    private volatile long netflixTriedAt;
+
+    /** Netflix's pool: from the cache first, then fetched again every 12 hours (Netflix installed and a TMDB key). */
+    void refreshNetflix(Runnable done) {
+        if (!netflixRunning.compareAndSet(false, true)) return;
+        netflixIo.execute(() -> {
+            try {
+                String pkg = detectApps(context).get("netflix");
+                if (pkg == null || readKey() == null) {
+                    if (netflixPool == null || !netflixPool.isEmpty()) { netflixPool = new ArrayList<>(); post(done); }
+                    return;
+                }
+                if (netflixPool == null) {
+                    netflixPool = netflixFrom(cache.getString("nf:pool", "[]"), pkg);
+                    if (!netflixPool.isEmpty()) post(done);
+                }
+                long now = System.currentTimeMillis();
+                if (now - cache.getLong("nf:at", 0) < NETFLIX_EVERY && !netflixPool.isEmpty()) return;
+                if (now - netflixTriedAt < NETFLIX_RETRY) return;
+                netflixTriedAt = now;
+                List<Pick> made = fetchNetflix(pkg);
+                if (made.isEmpty()) return;   // a failed read keeps what was there
+                netflixPool = made;
+                JSONArray a = new JSONArray();
+                for (Pick p : made) {
+                    a.put(new JSONObject().put("id", p.id).put("kind", p.kind).put("title", p.title).put("backdrop", p.backdrop)
+                            .put("new", p.label == ArrivalsLogic.NEW_ON).put("top10", p.top10));
+                }
+                cache.edit().putString("nf:pool", a.toString()).putLong("nf:at", now).apply();
+                AppLog.w("netflix: pool of " + made.size());
+                post(done);
+            } catch (Exception e) {
+                AppLog.w("netflix: " + e.getMessage());
+            } finally {
+                netflixRunning.set(false);
+            }
+        });
+    }
+
+    private static List<Pick> netflixFrom(String json, String pkg) {
+        List<Pick> out = new ArrayList<>();
+        try {
+            JSONArray a = new JSONArray(json);
+            for (int i = 0; i < a.length(); i++) {
+                JSONObject o = a.getJSONObject(i);
+                if (o.optInt("id") <= 0 || o.optString("backdrop").isEmpty()) continue;
+                out.add(netflixPick(o.optInt("id"), o.optString("kind"), o.optString("title"), o.optString("backdrop"),
+                        o.optBoolean("new"), o.optInt("top10"), pkg));
+            }
+        } catch (org.json.JSONException e) {
+            AppLog.w("netflix: cache unreadable");
+        }
+        return out;
+    }
+
+    private static Pick netflixPick(int id, String kind, String title, String backdrop, boolean fresh, int top10, String pkg) {
+        Pick p = new Pick();
+        p.id = id;
+        p.kind = "tv".equals(kind) ? "tv" : "movie";
+        p.title = title;
+        p.backdrop = backdrop;
+        p.app = "netflix";
+        p.pkg = pkg;
+        p.top10 = fresh ? 0 : top10;
+        if (fresh) { p.label = ArrivalsLogic.NEW_ON; p.labelApp = "netflix"; }
+        return p;
+    }
+
+    /** The Top 10 (found on TMDB by name) and the newest titles on Netflix here, pooled by NetflixLogic. */
+    private List<Pick> fetchNetflix(String pkg) throws Exception {
+        List<NetflixLogic.Title> top = new ArrayList<>();
+        try {
+            String tsv = httpText(NETFLIX_TOP10);
+            top = NetflixLogic.top10(tsv, REGION);
+            if (top.isEmpty()) top = NetflixLogic.top10(tsv, "ZZ");   // a country Netflix doesn't rank: the global list
+        } catch (IOException e) {
+            AppLog.w("netflix top 10: " + e.getMessage());
+        }
+        Map<String, Pick> byName = new HashMap<>();
+        List<NetflixLogic.Title> found = new ArrayList<>();
+        for (NetflixLogic.Title t : top) {
+            String kind = t.kind == NetflixLogic.MOVIE ? "movie" : "tv";
+            JSONArray r = get("/search/" + kind + "?query=" + URLEncoder.encode(t.name, "UTF-8")).optJSONArray("results");
+            List<Pick> l = new ArrayList<>();
+            for (int i = 0; r != null && i < r.length() && l.isEmpty(); i++) add(l, r.getJSONObject(i), kind);
+            if (l.isEmpty()) continue;
+            byName.put(NetflixLogic.norm(t.name), netflixPick(l.get(0).id, kind, t.name, l.get(0).backdrop, false, t.rank, pkg));
+            found.add(t);
+        }
+        List<JSONObject> fresh = new ArrayList<>();
+        for (String kind : new String[] {"movie", "tv"}) {
+            String date = kind.equals("movie") ? "primary_release_date" : "first_air_date";
+            JSONArray r = get("/discover/" + kind + "?with_watch_providers=" + NETFLIX_PROVIDER + "&watch_region=" + REGION
+                    + "&with_watch_monetization_types=flatrate&sort_by=" + date + ".desc&" + date + ".lte=" + day(0)
+                    + "&" + date + ".gte=" + day(-120) + "&vote_count.gte=3").optJSONArray("results");
+            for (int i = 0; r != null && i < r.length(); i++) {
+                JSONObject o = r.getJSONObject(i);
+                fresh.add(o.put("_kind", kind).put("_date", o.optString(date)));
+            }
+        }
+        java.util.Collections.sort(fresh, (a, b) -> b.optString("_date").compareTo(a.optString("_date")));
+        List<NetflixLogic.Title> added = new ArrayList<>();
+        for (JSONObject o : fresh) {
+            List<Pick> l = new ArrayList<>();
+            add(l, o, o.optString("_kind"));
+            if (l.isEmpty() || byName.containsKey(NetflixLogic.norm(l.get(0).title))) continue;
+            byName.put(NetflixLogic.norm(l.get(0).title), netflixPick(l.get(0).id, l.get(0).kind, l.get(0).title, l.get(0).backdrop, true, 0, pkg));
+            added.add(new NetflixLogic.Title(l.get(0).title, NetflixLogic.NEW, 0));
+        }
+        List<Pick> out = new ArrayList<>();
+        for (NetflixLogic.Title t : NetflixLogic.pool(found, added)) {
+            Pick p = byName.get(NetflixLogic.norm(t.name));
+            if (p != null) out.add(p);
+        }
+        return out;
+    }
+
+    /** Home's Netflix tiles for this part of the day: 4 of the pool, at least one Top 10 movie, show and new title. */
+    private List<Pick> netflixShown() {
+        List<Pick> pool = netflixPool;
+        List<Pick> out = new ArrayList<>();
+        if (pool == null || pool.isEmpty()) return out;
+        Map<NetflixLogic.Title, Pick> of = new java.util.IdentityHashMap<>();
+        List<NetflixLogic.Title> titles = new ArrayList<>();
+        for (Pick p : pool) {
+            int kind = p.label == ArrivalsLogic.NEW_ON ? NetflixLogic.NEW : "movie".equals(p.kind) ? NetflixLogic.MOVIE : NetflixLogic.SHOW;
+            NetflixLogic.Title t = new NetflixLogic.Title(p.title, kind, p.top10);
+            titles.add(t);
+            of.put(t, p);
+        }
+        for (NetflixLogic.Title t : NetflixLogic.pick(titles, NetflixLogic.SHOWN, appSeed)) out.add(of.get(t));
+        return out;
+    }
+
+    private static String httpText(String url) throws IOException {
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(15000);
+        try {
+            if (c.getResponseCode() != 200) throw new IOException("HTTP " + c.getResponseCode());
+            return read(c.getInputStream());
+        } finally {
+            c.disconnect();
+        }
     }
 
     // MARK: - Home's titles from the streaming apps (AppContent)
@@ -412,6 +577,7 @@ final class Recs {
 
     void refreshAppContent(Runnable done) {
         observeApps();
+        refreshNetflix(done);
         if (!AppContentLogic.mayRead(appFailedAt, System.currentTimeMillis())) return;
         if (!appRunning.compareAndSet(false, true)) return;
         appIo.execute(() -> {
@@ -1872,6 +2038,7 @@ final class Recs {
     /** The card's chip for a pick's label, "" for none (never a claim the data doesn't make). */
     static String labelText(Pick p) {
         if (p == null) return "";
+        if (p.top10 > 0) return "Top 10 · #" + p.top10;   // the same in every language
         switch (p.label) {
             case ArrivalsLogic.NEW_ON:
                 String name = p.labelApp == null ? null : SERVICE_NAME.get(p.labelApp);

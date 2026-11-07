@@ -69,3 +69,8 @@ Name VYRO, package `io.vyro.tv`, icon + TV banner from the owner's VYRO artwork 
 1.0.0 rebrand · 1.0.1 Home grid without TMDB, self-granted permissions · 1.0.2 home hand-off · 1.0.3 keys kept ·
 1.0.4 fewer debugging prompts · 1.0.5 IGDB games, A3 Settings rows · 1.0.6 Settings layout · 1.0.7 hourly update
 check · 1.0.8 personal settings kept.
+
+## Netflix tiles on Home (1.0.9)
+- Netflix publishes nothing to launchers, so Home adds 4 Netflix tiles (slots 0, 3, 6, 9) from a pool of 5 Top 10 movies, 5 Top 10 shows and 5 newest titles on Netflix in the region.
+- Top 10: `tools/netflix_top10.py` (run weekly by `pages.yml`) writes `docs/netflix-top10.tsv` to the site; the app reads it every 12 h. Newest titles and artwork: TMDB (needs the TMDB key). Logic: `NetflixLogic` (tests: `NetflixLogicTest`), wiring: `Recs.refreshNetflix` / `netflixShown`.
+- Tiles open through TitleLaunch (Watchmode link, `com.netflix.ninja`). Chip on focus: "Top 10 · #n" or "New on Netflix".

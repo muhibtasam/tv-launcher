@@ -8259,7 +8259,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             Recs.Pick p = list.get(i);
             lines[i] = i < contShown ? contLines.get(i)
                     : Recs.cardLine(p, HomeApps.serviceArt(getContext(), p.app) == null);   // logo shown: no name
-            chips[i] = i < contShown ? "" : p.label != ArrivalsLogic.NONE ? Recs.labelText(p) : p.followed ? Ui.tr("New season") : "";
+            chips[i] = i < contShown ? "" : p.label != ArrivalsLogic.NONE || p.top10 > 0 ? Recs.labelText(p) : p.followed ? Ui.tr("New season") : "";
         }
         bentoLines = lines;
         bentoChips = chips;
