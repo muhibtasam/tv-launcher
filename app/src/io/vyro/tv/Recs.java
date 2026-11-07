@@ -2650,7 +2650,7 @@ final class Recs {
     /** Services named in hide_services (config.properties), trimmed and lowercased: never a source of picks. */
     private static final Set<String> HIDDEN = new HashSet<>();
     static {
-        for (String s : Config.HIDE_SERVICES.split(",")) {
+        for (String s : BuildKeys.conf("hide_services", Config.HIDE_SERVICES).split(",")) {
             String key = s.trim().toLowerCase(Locale.ROOT);
             if (!key.isEmpty()) HIDDEN.add(key);
         }

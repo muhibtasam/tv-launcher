@@ -27,6 +27,25 @@ final class BuildKeys {
     static String twitchId() { return get("twitch_id", Config.TWITCH_CLIENT_ID); }
     static String twitchSecret() { return get("twitch_secret", Config.TWITCH_CLIENT_SECRET); }
 
+    /**
+     * A setting from config.properties (the shelf's apps, the city, crypto…): a build of your own (not --generic)
+     * saves it; a release (--generic, without your config) uses what yours saved, else its own default.
+     */
+    static synchronized String conf(String name, String built) {
+        String b = built == null ? "" : built;
+        SharedPreferences p = prefs();
+        if (p == null) return b;
+        if (!Config.GENERIC) {
+            if (!b.equals(p.getString("conf." + name, null))) p.edit().putString("conf." + name, b).apply();
+            return b;
+        }
+        return p.getString("conf." + name, b);
+    }
+
+    static boolean conf(String name, boolean built) {
+        return Boolean.parseBoolean(conf(name, String.valueOf(built)));
+    }
+
     /** The built-in key (saved for later builds), else the one an earlier build saved, else "". */
     private static synchronized String get(String name, String built) {
         String b = built == null ? "" : built.trim();

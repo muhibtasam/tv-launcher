@@ -7071,7 +7071,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         // The shelf and All Apps (100 to 500 ms of package queries on a TV) only when they can have changed.
         long up = SystemClock.uptimeMillis();
         boolean due = appsStale || Prefs.version != appsVersion || Ui.generation != appsGeneration
-                || up - appsAt > (Config.SHELF_MOST_USED ? 60_000 : APPS_MAX_AGE_MS);
+                || up - appsAt > (BuildKeys.conf("shelf_most_used", Config.SHELF_MOST_USED) ? 60_000 : APPS_MAX_AGE_MS);
         if (due && up < appsDeferredUntil) {
             // Just started with the saved dock: its rebuild (seconds of package queries and icon rendering) waits, so
             // the first moments are the user's. Opening Apps, or an app installed or removed, brings it forward.

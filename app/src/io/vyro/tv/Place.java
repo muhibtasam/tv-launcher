@@ -58,30 +58,30 @@ final class Place {
 
     /** Whether config.properties left the place out (a --generic build). */
     static boolean fromZone() {
-        return Config.LATITUDE.trim().isEmpty() || Config.LONGITUDE.trim().isEmpty();
+        return BuildKeys.conf("latitude", Config.LATITUDE).trim().isEmpty() || BuildKeys.conf("longitude", Config.LONGITUDE).trim().isEmpty();
     }
 
     static String city() {
-        if (!fromZone()) return Config.CITY;
+        if (!fromZone()) return BuildKeys.conf("city", Config.CITY);
         load();
-        return Config.CITY.trim().isEmpty() ? city : Config.CITY;
+        return BuildKeys.conf("city", Config.CITY).trim().isEmpty() ? city : BuildKeys.conf("city", Config.CITY);
     }
 
     static String latitude() {
-        if (!fromZone()) return Config.LATITUDE;
+        if (!fromZone()) return BuildKeys.conf("latitude", Config.LATITUDE);
         load();
         return latitude;
     }
 
     static String longitude() {
-        if (!fromZone()) return Config.LONGITUDE;
+        if (!fromZone()) return BuildKeys.conf("longitude", Config.LONGITUDE);
         load();
         return longitude;
     }
 
     /** Prices in reais in Brazil, in euros in the euro area, else in dollars (as on LG and Samsung). */
     static String currency() {
-        String v = Config.CURRENCY.trim().toUpperCase(Locale.ROOT);
+        String v = BuildKeys.conf("currency", Config.CURRENCY).trim().toUpperCase(Locale.ROOT);
         if (!v.isEmpty()) return v;
         load();
         return country.equals("BR") ? "BRL" : EURO.matcher(country).matches() ? "EUR" : "USD";
@@ -89,7 +89,7 @@ final class Place {
 
     /** The picks' streaming region. */
     static String region() {
-        String v = Config.TMDB_REGION.trim().toUpperCase(Locale.ROOT);
+        String v = BuildKeys.conf("tmdb_region", Config.TMDB_REGION).trim().toUpperCase(Locale.ROOT);
         if (!v.isEmpty()) return v;
         load();
         return country.toUpperCase(Locale.ROOT);

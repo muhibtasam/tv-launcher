@@ -198,7 +198,7 @@ final class Prefs {
 
     /** "auto", "C" or "F". */
     static String temperature() {
-        String v = sp().getString("temperature", Config.TEMPERATURE).trim().toUpperCase(Locale.ROOT);
+        String v = sp().getString("temperature", BuildKeys.conf("temperature", Config.TEMPERATURE)).trim().toUpperCase(Locale.ROOT);
         return v.startsWith("F") ? "F" : v.startsWith("C") ? "C" : "auto";
     }
 
@@ -229,7 +229,7 @@ final class Prefs {
             String saved = sp().getString("servicesOff", null);
             if (saved == null) {   // not chosen on the TV yet: what hide_services says
                 StringBuilder first = new StringBuilder();
-                for (String key : Config.HIDE_SERVICES.split(",")) {
+                for (String key : BuildKeys.conf("hide_services", Config.HIDE_SERVICES).split(",")) {
                     key = key.trim().toLowerCase(Locale.ROOT);
                     if (!key.isEmpty()) first.append(first.length() > 0 ? "," : "").append(key);
                 }
@@ -365,7 +365,7 @@ final class Prefs {
     static boolean homeAssistant() { return sp().getBoolean("homeAssistant", false); }
     static void setHomeAssistant(boolean on) { put("homeAssistant", on); }
 
-    static boolean quotes() { return sp().getBoolean("quotes", Config.SHOW_CRYPTO); }
+    static boolean quotes() { return sp().getBoolean("quotes", BuildKeys.conf("show_crypto", Config.SHOW_CRYPTO)); }
     static void setQuotes(boolean on) { put("quotes", on); }
 
     /** Your photos (Photos, sent from a computer) on the screensaver and behind the home screen, once imported. */
@@ -420,6 +420,12 @@ final class Prefs {
 
     /** Packages on the home shelf, in order; null until the user edits it (then the built-in list applies). */
     static List<String> shelf() {
+        // A build of your own with a new shelf_apps list: that list wins over the order saved before (once, per list).
+        String built = Config.GENERIC ? "" : Config.SHELF_APPS.trim();
+        if (!built.isEmpty() && !built.equals(sp().getString("shelfFrom", ""))) {
+            sp().edit().remove("shelf").putString("shelfFrom", built).apply();
+            return null;
+        }
         String v = sp().getString("shelf", null);
         if (v == null) return null;
         List<String> out = new ArrayList<>();

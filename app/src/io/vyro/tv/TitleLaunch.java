@@ -186,7 +186,7 @@ final class TitleLaunch {
 
     /** Nuvio's page for a title when open_in_nuvio is on and Nuvio is on the TV, else null. */
     private Intent nuvio(String kind, int tmdbId) {
-        if (!Config.OPEN_IN_NUVIO || tmdbId <= 0 || !("movie".equals(kind) || "tv".equals(kind))) return null;
+        if (!BuildKeys.conf("open_in_nuvio", Config.OPEN_IN_NUVIO) || tmdbId <= 0 || !("movie".equals(kind) || "tv".equals(kind))) return null;
         for (String pkg : NUVIO) {
             if (HomeApps.launchIntent(context.getPackageManager(), pkg) == null) continue;
             return new Intent(Intent.ACTION_VIEW, android.net.Uri.parse("nuvio://tmdb/" + ("movie".equals(kind) ? "movie" : "series") + "/" + tmdbId))

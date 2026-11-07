@@ -417,10 +417,10 @@ final class HomeApps {
      */
     static List<String> fixedShelf(Context c) {
         List<String> out = new ArrayList<>();
-        if (Config.SHELF_APPS.trim().isEmpty()) return out;
+        if (BuildKeys.conf("shelf_apps", Config.SHELF_APPS).trim().isEmpty()) return out;
         PackageManager pm = c.getPackageManager();
         List<String[]> apps = launchable(c);
-        for (String want : Config.SHELF_APPS.split(",")) {
+        for (String want : BuildKeys.conf("shelf_apps", Config.SHELF_APPS).split(",")) {
             if (out.size() >= MAX_SHELF) break;
             String w = squash(want);
             if (w.isEmpty()) continue;
