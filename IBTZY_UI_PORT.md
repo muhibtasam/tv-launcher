@@ -227,3 +227,4 @@ serial worker; "Picks from" lookups are memoised per settings change (`Recs.hidd
 - Rebrand: app name VYRO, package io.vyro.tv (new app: on the TV, switch the old io.freemytv build to Original and uninstall it first), icon + TV banner from the owner's VYRO artwork, repo github.com/muhibtasam/vyro, APK VYRO.apk, disabled-apps record vyro_disabled. Signing keystore and password unchanged (freemytv.keystore).
 - Release v1.0.0 (versionCode 10) built with --generic: no API keys, Games off.
 - LG/Samsung: display name VYRO; Tizen package id and docs/ (upstream site) unchanged.
+- 1.0.1: Home grid without a TMDB key (picksOn always on; Movies tab needs the key); VYRO grants itself READ_TV_LISTINGS + usage access + TCL AUTO_START from :home via the TV ADB (prompt accepted once). TV: grid verified (15 titles, Prime + Crunchyroll). Old io.freemytv and io.ibtzy.tvlauncher removed from the TV.

@@ -746,6 +746,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         if (running) return;
         running = true;
         refreshTabs();
+        autoGrant();
         recs.refreshWatchNext(this::updateCards);   // Continue Watching: what the apps say you left half-way
         recs.refreshAppContent(this::updateCards);  // Home's grid: the titles the apps publish themselves
         Photos.importInbox(getContext(), () -> {});   // the screensaver's photos a computer just sent
@@ -994,9 +995,33 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         return showMovies != showGames;
     }
 
+    private static boolean grantAsked;   // once per home process
+
+    /**
+     * What the home screen needs, given by the app itself through the TV's own ADB (HomeMode.grantWatchNow): the TV's
+     * listings (Home's grid from the apps, Continue Watching) and usage access. Asked once per process, only when
+     * missing; once given, the grid and the Continue row are read again at once.
+     */
+    private void autoGrant() {
+        if (grantAsked || WatchNext.allowed(getContext())) return;
+        grantAsked = true;
+        final Context app = getContext().getApplicationContext();
+        // Here, not as a job: TCL's TclAppBoot refuses a fresh install's jobs until auto start is allowed.
+        LOADER.execute(() -> {
+            HomeMode.ensureAutoStart(app, 8_000);
+            HomeMode.grantWatchNow(app);
+            if (!WatchNext.allowed(app)) return;
+            handler.post(() -> {
+                recs.retryAppContentNow();
+                recs.refreshWatchNext(this::updateCards);
+                recs.refreshAppContent(this::updateCards);
+            });
+        });
+    }
+
     /** The settings may have changed (Settings is another screen of this app): tabs and For You's section follow. */
     private void refreshTabs() {
-        boolean m = Prefs.tabMovies(), g = Prefs.tabGames(), a = Prefs.tabApps();
+        boolean m = Prefs.tabMovies() && Recs.hasKey(getContext()), g = Prefs.tabGames(), a = Prefs.tabApps();   // Movies needs TMDB
         if (m == showMovies && g == showGames && a == showApps) return;
         showMovies = m;
         showGames = g;
@@ -8617,8 +8642,12 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         c.drawText(wcTime, right - wl - 16 * k - wcTimePaint.measureText(wcTime), base, wcTimePaint);
     }
 
+    /**
+     * The tabbed home with its grid. Always on: Home's grid comes from what the streaming apps publish themselves
+     * (Recs.homeShown, AppContent), never from TMDB. Only Movies and Shows need a TMDB key (refreshTabs hides them).
+     */
     private boolean picksOn() {
-        return Recs.hasKey(getContext());
+        return true;
     }
 
     private void drawClock(Canvas c) {

@@ -1236,6 +1236,7 @@ final class HomeMode {
         if (WatchNext.allowed(app)) return;
         try (Adb adb = Adb.connect(app, 8_000, null)) {
             adb.shell("pm grant " + PKG + " " + WatchNext.PERMISSION);
+            usageAccess(adb, true);   // the shelf's most used apps, as a switch to VYRO gives it
             AppLog.w("continue watching permission " + (WatchNext.allowed(app) ? "granted" : "not granted"));
         } catch (IOException e) {
             AppLog.w("continue watching permission: " + e.getMessage());

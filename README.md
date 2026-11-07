@@ -1,35 +1,50 @@
 <div align="center">
 
-<img src="docs/assets/icon-512.png" width="96" alt="">
+<img src="docs/assets/icon-512.png" width="112" alt="VYRO icon">
 
 # VYRO
 
-**A fast, ad-free home screen for Google TV, LG and Samsung TVs.**
+**A premium, futuristic home screen for Google TV and Android TV.**
 
-Trending picks from your own apps, the weather at a glance, and a look that follows the sunset.<br>
-Open source. Built with Claude Code. One button to undo.
+What your streaming apps are showing, your apps one press away, and a calm, cinematic look. No ads, no sponsored rows.<br>
+Open source. Every update asks first. One button gives your TV's own home screen back.
 
-[**Download**](https://github.com/muhibtasam/vyro/releases/latest) · [Install](#install) · [LG TVs](#lg-tvs-webos) · [Samsung TVs](#samsung-tvs-tizen) · [Any TV](#any-tv) · [Make it yours](#make-it-yours)
+[**Download**](https://github.com/muhibtasam/vyro/releases/latest) · [Install](#install) · [Settings](#settings) · [Going back](#going-back) · [How it works](#how-it-works)
 
-<img src=".github/preview.webp" width="880" alt="The VYRO home screen: a glass shelf of apps, trending picks, and a drawer with the weather and crypto prices">
+<img src=".github/screens/home.jpg" width="880" alt="VYRO's home screen: a greeting, the Home and Apps tabs, a bento grid of titles from Prime Video and Crunchyroll, and the dock">
 
 </div>
 
-> **VYRO** — a premium, futuristic home screen for Google TV and Android TV. VYRO is a fork of [Free My TV](https://github.com/simbasjungles/free-my-tv)
-> with the look of ibtzy TV Launcher on Google TV and Android TV: ibtzy's home screen, tabs (Home, Movies, Apps;
-> Games off until turned on in *Settings* → *Tabs*), Control Center, screensaver and settings, over Free My TV's mode
-> switch, watchdog and one-button undo. What it adds on Google TV and Android TV:
->
-> - **Updates that always ask.** A daily check of [this repository's releases](https://github.com/muhibtasam/vyro/releases/latest);
->   when one is ready, a sheet shows the version, its size and date and what's new, with *Install* and *Later*. Nothing
->   installs by itself, and Android's installer asks again.
-> - **Google notifications** in the Control Center, with an orange dot on its button while some are unread
->   (*Home Settings* → *Google notifications*).
-> - **Continue Watching** you can tidy: hold OK on a card to remove it; it comes back after you watch it again.
->
-> The LG and Samsung builds come from Free My TV and keep its look.
+## What VYRO is
 
-## What you get
+VYRO replaces the home screen of a Google TV or Android TV with one that's about what you watch, not what's advertised.
+It runs on the TV itself, switches in from its own settings, and hands the TV's original home screen back with one button.
+
+- **Home: a bento grid of what your apps publish.** Prime Video, Crunchyroll and the other apps you have put their own
+  titles on Android TV; VYRO mixes them into one grid, with what you left half-way (Continue Watching) first. No TMDB key
+  needed for it. Hold OK on a Continue card to remove it.
+- **Apps: everything in one place.** Search with the remote or your voice, your most used apps, and all apps A to Z.
+- **Control Center** for quick settings and your Google apps' notifications, with an orange dot
+  while some are unread.
+- **Updates that always ask.** VYRO checks this repository's releases once a day and shows what's new, with *Install*
+  and *Later*. Nothing installs by itself, and Android asks again.
+- **A screensaver** with the titles' artwork or your own photos (portraits and panoramas shown whole), a clock and the weather.
+- **Optional:** Movies and Shows tabs with a TMDB key, Trakt, Plex, Immich, Home Assistant, and opening titles in Nuvio or Stremio.
+- **Gives itself what it needs.** On first start VYRO allows itself the TV's listings and usage access through the TV's
+  own debugging connection (accept the TV's prompt once), and takes them back when you return to the original home screen.
+
+<table>
+<tr>
+<td><img src=".github/screens/apps.jpg" alt="The Apps tab: search, most used apps and all apps"></td>
+<td><img src=".github/screens/settings.jpg" alt="VYRO's settings: home screen, screensaver, tabs, shelf, top and remote buttons"></td>
+</tr>
+<tr><td align="center">Apps</td><td align="center">Settings</td></tr>
+</table>
+
+VYRO is a fork of [Free My TV](https://github.com/simbasjungles/free-my-tv) with the design of ibtzy TV Launcher. The LG
+and Samsung builds below come from Free My TV and keep its look.
+
+## Also in VYRO
 
 - **No ads.** No sponsored rows, banners or autoplaying promos. Not one.
 - **Your apps, front and center.** The streaming apps you actually use, on a glass shelf. Pick them and their order right on the TV.

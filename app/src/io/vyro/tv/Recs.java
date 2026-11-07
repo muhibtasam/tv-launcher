@@ -405,6 +405,11 @@ final class Recs {
      * day). A failed read keeps everything; `done` runs on the main thread when Home's titles changed, or after the
      * first read.
      */
+    /** The listings permission just arrived: the next read runs now, not after the 5 minutes a failed one waits. */
+    void retryAppContentNow() {
+        appFailedAt = 0;
+    }
+
     void refreshAppContent(Runnable done) {
         observeApps();
         if (!AppContentLogic.mayRead(appFailedAt, System.currentTimeMillis())) return;
