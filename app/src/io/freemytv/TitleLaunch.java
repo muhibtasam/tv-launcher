@@ -101,6 +101,8 @@ final class TitleLaunch {
      * memory and a cached resolve check (no network).
      */
     Intent intent(String kind, int tmdbId, String shown) {
+        Intent nuvio = nuvio(kind, tmdbId);   // open_in_nuvio: its own page wins over the title's app (upstream)
+        if (nuvio != null) return nuvio;
         Map<String, String> byService = linksOf(kind, tmdbId);
         if (byService == null || byService.isEmpty()) return null;
         Map<String, String> installed = apps();
@@ -175,6 +177,20 @@ final class TitleLaunch {
     private Boolean resolveCached(String pkg, String url) {
         synchronized (resolves) {
             for (Map.Entry<String, Boolean> e : resolves.entrySet()) if (e.getKey().startsWith(pkg + "|" + url)) return e.getValue();
+        }
+        return null;
+    }
+
+    /** Nuvio: the release APK and Google Play's, the same app; it takes nuvio://tmdb/<movie|series>/<tmdb id>. */
+    private static final String[] NUVIO = {"com.nuvio.tv", "com.nuvio.app"};
+
+    /** Nuvio's page for a title when open_in_nuvio is on and Nuvio is on the TV, else null. */
+    private Intent nuvio(String kind, int tmdbId) {
+        if (!Config.OPEN_IN_NUVIO || tmdbId <= 0 || !("movie".equals(kind) || "tv".equals(kind))) return null;
+        for (String pkg : NUVIO) {
+            if (HomeApps.launchIntent(context.getPackageManager(), pkg) == null) continue;
+            return new Intent(Intent.ACTION_VIEW, android.net.Uri.parse("nuvio://tmdb/" + ("movie".equals(kind) ? "movie" : "series") + "/" + tmdbId))
+                    .setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         }
         return null;
     }

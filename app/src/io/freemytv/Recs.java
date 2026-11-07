@@ -98,7 +98,9 @@ final class Recs {
     /** Explore's release window: today and the 6 days before, in the TV's time zone. */
     static final int WINDOW_DAYS = 7;
     /** Bump when what is saved for each title changes (the saved list is discarded and fetched again). */
-    private static final int CACHE_VERSION = 9;   // 9: back to the 7-day releases (the trending cache is dropped)
+    /** By subscription, with ads (Pluto TV) or free: never rent or buy (upstream #348). */
+    private static final String WATCH_TYPES = "flatrate%7Cads%7Cfree";
+    private static final int CACHE_VERSION = 10;   // 10: free and ad-supported services count   // 9: back to the 7-day releases (the trending cache is dropped)
     private static final int MANHA = 0, TARDE = 1, NOITE = 2;
     /** Service name on TMDB (part of the name, lowercase) → TV app (HomeApps key, package). */
     private static final String[][] SERVICES = {
@@ -1910,7 +1912,7 @@ final class Recs {
         refreshArrivals(services);
         StringBuilder ids = new StringBuilder();
         for (int id : services.keySet()) ids.append(ids.length() == 0 ? "" : "|").append(id);
-        String base = "&language=" + lang() + "&watch_region=" + REGION + "&with_watch_monetization_types=flatrate&include_adult=false"
+        String base = "&language=" + lang() + "&watch_region=" + REGION + "&with_watch_monetization_types=" + WATCH_TYPES + "&include_adult=false"
                 + "&sort_by=popularity.desc&without_genres=" + KIDS + (Prefs.hideAnimation() ? "," + ANIMATION : "");   // Kids: shows only (movies have no such genre)
         String common = base + "&with_watch_providers=" + URLEncoder.encode(ids.toString(), "UTF-8");
         // 1. Trending this week (TMDB goes by what people are watching and searching for right now), only what is
@@ -2679,6 +2681,7 @@ final class Recs {
         installedAt.put(pkg, new long[] {yes ? 1 : 0, now});
         return yes;
     }
+
 
     private long sourceStamp() {
         long stamp = (key().hashCode() * 31L + REGION.hashCode()) * 31L + (Prefs.hideAnimation() ? 1 : 0);

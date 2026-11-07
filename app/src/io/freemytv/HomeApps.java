@@ -27,6 +27,7 @@ import android.graphics.drawable.Drawable;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
+import android.os.Build;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.view.View;
@@ -1109,6 +1110,7 @@ final class HomeApps {
         // No "TV Settings" here any more: the round Settings button at the top opens them.
         return items;
     }
+
 
     /** A streaming service's app (the "Watch" button of the featured pick). */
     static Item app(String pkg, String label, String uri) {

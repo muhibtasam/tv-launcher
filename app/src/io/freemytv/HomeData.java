@@ -38,11 +38,25 @@ final class HomeData {
     private static final String CURRENCY = Place.currency();
     /** Binance has no pairs in some currencies (INR...) and then refuses the whole request: prices go in dollars instead. */
     private static volatile boolean inDollars;
+    /**
+     * A currency Binance lists no pairs in (COP, MXN...): the coins are fetched in USDT and converted with the local
+     * USDT pair (USDTCOP), which also gives the dollar card its rate. Dollars only when that pair is missing too.
+     */
+    private static volatile boolean inFx;
 
     /** Binance quotes dollars as USDT. */
     private static String quote() {
-        return CURRENCY.equals("USD") || inDollars ? "USDT" : CURRENCY;
+        return CURRENCY.equals("USD") || inFx || inDollars ? "USDT" : CURRENCY;
     }
+
+    /** The pair that turns USDT into the local currency (USDTCOP for Colombia). */
+    private static String fxSymbol() { return "USDT" + CURRENCY; }
+
+    /** The currency and how it's quoted: a cached body from another one must be fetched again, not shown. */
+    private static String currencyKey() {
+        return CURRENCY + (inFx ? "#fx" : inDollars ? "#usd" : "");
+    }
+
     private static final String WEATHER_QUERY = "&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset"
             + "&hourly=temperature_2m,weather_code,is_day&timezone=auto&forecast_days=2";
 
@@ -56,28 +70,36 @@ final class HomeData {
     private static final long PRICES_EVERY = 5 * 60_000L, WEATHER_EVERY = 30 * 60_000L;
     interface Listener { void onData(); }
 
-    /** BTC, ETH and SOL; in Brazilian reais also the dollar (USDT/BRL), which Binance doesn't list for most currencies. */
+    /** BTC, ETH and SOL; in Brazilian reais or converted from USDT, also the dollar (USDT in local currency). */
     static int coinCount() {
         return Prefs.quotes() ? active().length : 0;
     }
 
+    /** The dollar card shows the USDT rate when there is one to show (reais, or a currency converted from USDT). */
+    static boolean dollarRow() {
+        return !inDollars && (CURRENCY.equals("BRL") || inFx);
+    }
+
     private static volatile int[] activeCoins;
     private static volatile int activeVersion = -1;
-    private static volatile boolean activeInDollars;
+    private static volatile boolean activeInDollars, activeInFx;
 
     /** Indexes in COINS of the coins the user has on (and that Binance lists in this currency). */
     static int[] active() {
         int[] a = activeCoins;
-        boolean dollars = inDollars;
-        if (a != null && activeVersion == Prefs.version && activeInDollars == dollars) return a;
+        boolean dollars = inDollars, fx = inFx;
+        if (a != null && activeVersion == Prefs.version && activeInDollars == dollars && activeInFx == fx) return a;
         int n = 0;
         int[] tmp = new int[COINS.length];
-        // The dollar only in reais, not in dollars: USDTUSDT isn't a pair, and Binance would refuse the whole request.
-        for (int i = 0; i < COINS.length; i++) if (Prefs.coin(i) && (i < 3 || CURRENCY.equals("BRL") && !dollars)) tmp[n++] = i;
+        // The dollar only where there's a rate for it, not in dollars: USDTUSDT isn't a pair, and Binance would
+        // refuse the whole request.
+        boolean dollar = dollarRow();
+        for (int i = 0; i < COINS.length; i++) if (Prefs.coin(i) && (i < 3 || dollar)) tmp[n++] = i;
         a = java.util.Arrays.copyOf(tmp, n);
         activeCoins = a;
         activeVersion = Prefs.version;
         activeInDollars = dollars;
+        activeInFx = fx;
         return a;
     }
 
@@ -99,7 +121,11 @@ final class HomeData {
     private static String pricesPath() {
         StringBuilder symbols = new StringBuilder();
         int[] coins = active();
-        for (int i = 0; i < coins.length; i++) symbols.append(i == 0 ? "" : ",").append("%22").append(COINS[coins[i]]).append(quote()).append("%22");
+        for (int i = 0; i < coins.length; i++) {
+            if (inFx && coins[i] == 3) continue;   // the USDT rate below is the dollar's price
+            symbols.append(symbols.length() == 0 ? "" : ",").append("%22").append(COINS[coins[i]]).append(quote()).append("%22");
+        }
+        if (inFx) symbols.append(symbols.length() == 0 ? "" : ",").append("%22").append(fxSymbol()).append("%22");
         return "/api/v3/ticker/24hr?type=MINI&symbols=%5B" + symbols + "%5D";
     }
 
@@ -154,8 +180,9 @@ final class HomeData {
     private HomeData(Context c) {
         cache = c.getSharedPreferences("homedata", Context.MODE_PRIVATE);
         inDollars = CURRENCY.equals(cache.getString("dollarsFor", ""));
+        inFx = !inDollars && CURRENCY.equals(cache.getString("fxFor", ""));
         try {
-            if (Prefs.quotes()) {
+            if (Prefs.quotes() && currencyKey().equals(cache.getString("pricesFor", ""))) {
                 String p = cache.getString("prices", null);
                 if (p != null) parsePrices(p);
                 pricesAt = cache.getLong("pricesAt", 0);
@@ -181,18 +208,36 @@ final class HomeData {
             io.execute(() -> {
                 try {
                     String body;
-                    try {
-                        body = getPrices();
-                    } catch (IOException e) {
-                        if (inDollars || CURRENCY.equals("USD") || !"HTTP 400".equals(e.getMessage())) throw e;
+                    // Binance refuses the whole request for a currency it lists no pairs in (HTTP 400): the coins are
+                    // fetched in USDT and converted with USDT<currency> first, and only in dollars when that's missing too.
+                    while (true) {
+                        try {
+                            body = getPrices();
+                            break;
+                        } catch (IOException e) {
+                            if (inDollars || CURRENCY.equals("USD") || !"HTTP 400".equals(e.getMessage())) throw e;
+                            if (!inFx) {
+                                inFx = true;
+                                AppLog.w("prices: no " + CURRENCY + " pairs, converting from USDT (" + fxSymbol() + ")");
+                            } else {
+                                inFx = false;   // dollars: the next request no longer asks for USDT<currency>
+                                inDollars = true;
+                                cache.edit().putString("dollarsFor", CURRENCY).apply();
+                                AppLog.w("prices: no " + CURRENCY + " or " + fxSymbol() + " pairs, using dollars");
+                            }
+                        }
+                    }
+                    if (!inDollars && !inFx && !CURRENCY.equals("USD") && halted(body, System.currentTimeMillis())) {
+                        // Not saved, unlike a currency Binance doesn't list: the market may open again (next start).
                         inDollars = true;
-                        cache.edit().putString("dollarsFor", CURRENCY).apply();
-                        AppLog.w("prices: Binance has no " + CURRENCY + " pairs, using dollars");
+                        AppLog.w("prices: Binance has halted its " + CURRENCY + " pairs, using dollars");
                         body = getPrices();
                     }
                     parsePrices(body);
                     pricesAt = System.currentTimeMillis();
-                    cache.edit().putString("prices", body).putLong("pricesAt", pricesAt).apply();
+                    cache.edit().putString("prices", body).putLong("pricesAt", pricesAt)
+                            .putString("pricesFor", currencyKey())
+                            .putString("fxFor", inFx ? CURRENCY : cache.getString("fxFor", "")).apply();
                     notifyListeners();
                 } catch (Exception e) {
                     pricesFailedAt = System.currentTimeMillis();
@@ -242,13 +287,33 @@ final class HomeData {
         main.post(() -> { for (Listener l : new ArrayList<>(listeners)) l.onData(); });
     }
 
+    /**
+     * A pair with no trade for a day: Binance halted it and keeps answering with the frozen last price (its AUD pairs
+     * since 2026-10-06). Answers without closeTime (the plain price list) never read as halted.
+     */
+    static boolean halted(String body, long now) throws Exception {
+        JSONArray list = new JSONArray(body);
+        for (int i = 0; i < list.length(); i++) {
+            long close = list.getJSONObject(i).optLong("closeTime", 0);
+            if (close > 0 && now - close > 24 * 60 * 60_000L) return true;
+        }
+        return false;
+    }
+
     private void parsePrices(String body) throws Exception {
         JSONArray list = new JSONArray(body);
         String quote = quote();
         int found = 0;
+        double fx = Double.NaN, fxOpen = Double.NaN;
+        boolean[] got = new boolean[COINS.length];
         for (int i = 0; i < list.length(); i++) {
             JSONObject o = list.getJSONObject(i);
             String symbol = o.getString("symbol");
+            if (inFx && symbol.equals(fxSymbol())) {
+                fx = Double.parseDouble(o.optString("lastPrice", o.optString("price", "NaN")));
+                fxOpen = Double.parseDouble(o.optString("openPrice", "NaN"));
+                continue;
+            }
             for (int k = 0; k < COINS.length; k++) {
                 if (!symbol.equals(COINS[k] + quote)) continue;
                 found++;
@@ -256,9 +321,18 @@ final class HomeData {
                 double open = Double.parseDouble(o.optString("openPrice", "NaN"));
                 prices[k] = last;
                 changes[k] = open > 0 ? (last - open) / open * 100 : Double.NaN;
+                got[k] = true;
             }
         }
-        if (found == 0) pricesAt = 0;   // cached in another currency (config changed): fetch again
+        if (inFx) {
+            // The coins came in USDT: the local pair turns them into the currency (and is the dollar card's rate).
+            if (Double.isNaN(fx) || fx <= 0) throw new Exception("no " + fxSymbol() + " rate");
+            for (int k = 0; k < 3; k++) if (got[k]) prices[k] *= fx;
+            prices[3] = fx;
+            changes[3] = fxOpen > 0 ? (fx - fxOpen) / fxOpen * 100 : Double.NaN;
+        } else if (found == 0) {
+            pricesAt = 0;   // cached in another currency (config changed): fetch again
+        }
     }
 
     private static Weather parseWeather(String body) throws Exception {
