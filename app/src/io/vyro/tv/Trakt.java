@@ -37,11 +37,11 @@ final class Trakt {
     private static final String REDIRECT = "http://localhost/callback";
 
     static boolean configured() {
-        return !Config.TRAKT_CLIENT_ID.trim().isEmpty();
+        return !BuildKeys.trakt().trim().isEmpty();
     }
 
     private static String clientId() {
-        return Config.TRAKT_CLIENT_ID.trim();
+        return BuildKeys.trakt().trim();
     }
 
     // MARK: - Tokens (a file: the settings and the home screen are separate processes)

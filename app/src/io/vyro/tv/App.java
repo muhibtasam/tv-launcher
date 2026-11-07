@@ -6,6 +6,7 @@ import android.app.Application;
 public class App extends Application {
     @Override public void onCreate() {
         super.onCreate();
+        BuildKeys.init(this);   // the built-in API keys, kept for keyless updates
         Place.init(this);   // no storage needed: the weather's place from the time zone, read on first use
         readMemoryTier();
         // At power-on the home screen starts before the TV's storage unlocks (it is direct-boot aware): settings and

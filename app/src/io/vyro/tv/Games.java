@@ -56,7 +56,7 @@ final class Games {
     }
 
     static boolean configured() {
-        return !Config.RAWG_KEY.trim().isEmpty();
+        return !BuildKeys.rawg().trim().isEmpty();
     }
 
     private final Context context;
@@ -380,7 +380,7 @@ final class Games {
     private volatile JSONArray ocList = new JSONArray();   // OpenCritic's lists: {id, name, score, tier, reviews}
 
     private boolean criticsDue(long now) {
-        if (Config.OPENCRITIC_KEY.trim().isEmpty()) return false;
+        if (BuildKeys.openCritic().trim().isEmpty()) return false;
         if (criticsFailedAt != 0 && now - criticsFailedAt < 3600_000L && now >= criticsFailedAt) return false;
         return now - criticsAt > CRITICS_TTL || now < criticsAt;
     }
@@ -397,7 +397,7 @@ final class Games {
             List<Discover.Title> psGames = new ArrayList<>();
             for (Discover.Title t : v1Games(rows)) if (onPlayStation(t)) psGames.add(t);
             // Games V1's art (SteamGridDB) and anticipation (Wikipedia), each game once (kept; looked at again later).
-            if (!Config.STEAMGRIDDB_KEY.trim().isEmpty() || igdbOn()) {
+            if (!BuildKeys.steamGrid().trim().isEmpty() || igdbOn()) {
                 List<Discover.Title> need = new ArrayList<>();
                 for (Discover.Title t : v1Games(rows)) if (artDue(t.id, now)) need.add(t);
                 for (Discover.Title t : need) jobs.add(pool.submit(() -> {   // each shows as soon as it's in
@@ -664,7 +664,7 @@ final class Games {
     }
 
     private boolean v1ArtMissing(long now) {
-        if (Config.STEAMGRIDDB_KEY.trim().isEmpty() && !igdbOn()) return false;
+        if (BuildKeys.steamGrid().trim().isEmpty() && !igdbOn()) return false;
         for (Discover.Title t : v1Games(rows)) if (artDue(t.id, now)) return true;
         return false;
     }
@@ -704,7 +704,7 @@ final class Games {
 
     /** One game's SteamGridDB art: the same game only (its exact name); textless portrait art before one with a logo. */
     private void sgdbArt(Discover.Title t) {
-        String key = Config.STEAMGRIDDB_KEY.trim();
+        String key = BuildKeys.steamGrid().trim();
         long now = System.currentTimeMillis();
         try {
             int game = key.isEmpty() ? 0 : sgdbGame(t.title, key);
@@ -771,7 +771,7 @@ final class Games {
     private static String igdbToken = "";
 
     private static boolean igdbOn() {
-        return !Config.TWITCH_CLIENT_ID.trim().isEmpty() && !Config.TWITCH_CLIENT_SECRET.trim().isEmpty();
+        return !BuildKeys.twitchId().trim().isEmpty() && !BuildKeys.twitchSecret().trim().isEmpty();
     }
 
     /** IGDB's API, one request at a time, 4 a second at most (its limit), with an app token (asked for again before it ends). */
@@ -780,8 +780,8 @@ final class Games {
             long now = System.currentTimeMillis();
             if (igdbToken.isEmpty() || now > igdbTokenUntil) {
                 HttpURLConnection c = (HttpURLConnection) new URL("https://id.twitch.tv/oauth2/token?grant_type=client_credentials&client_id="
-                        + URLEncoder.encode(Config.TWITCH_CLIENT_ID.trim(), "UTF-8") + "&client_secret="
-                        + URLEncoder.encode(Config.TWITCH_CLIENT_SECRET.trim(), "UTF-8")).openConnection();
+                        + URLEncoder.encode(BuildKeys.twitchId().trim(), "UTF-8") + "&client_secret="
+                        + URLEncoder.encode(BuildKeys.twitchSecret().trim(), "UTF-8")).openConnection();
                 c.setRequestMethod("POST");
                 c.setConnectTimeout(5000);
                 c.setReadTimeout(10000);
@@ -802,7 +802,7 @@ final class Games {
             c.setDoOutput(true);
             c.setConnectTimeout(5000);
             c.setReadTimeout(10000);
-            c.setRequestProperty("Client-ID", Config.TWITCH_CLIENT_ID.trim());
+            c.setRequestProperty("Client-ID", BuildKeys.twitchId().trim());
             c.setRequestProperty("Authorization", "Bearer " + igdbToken);
             c.setRequestProperty("Accept", "application/json");
             try {
@@ -1082,7 +1082,7 @@ final class Games {
         if (have != null) return have;
         Critics c = new Critics();
         critics.put(t.id, c);
-        if (Config.OPENCRITIC_KEY.trim().isEmpty()) {
+        if (BuildKeys.openCritic().trim().isEmpty()) {
             c.error = Ui.tr("Critics' reviews need an OpenCritic key.");
             c.done = true;
             return c;
@@ -1225,7 +1225,7 @@ final class Games {
         final long t0 = android.os.SystemClock.uptimeMillis();
         c.setConnectTimeout(5000);
         c.setReadTimeout(10000);
-        c.setRequestProperty("X-RapidAPI-Key", Config.OPENCRITIC_KEY.trim());
+        c.setRequestProperty("X-RapidAPI-Key", BuildKeys.openCritic().trim());
         c.setRequestProperty("X-RapidAPI-Host", OC_HOST);
         // As curl sends it (that works; from the TV the same request got HTTP 502): JSON, our name, and no gzip (Android
         // asks for gzip by itself).
@@ -1328,7 +1328,7 @@ final class Games {
     // MARK: - Network and cache
 
     private static JSONObject rawg(String path) throws Exception {
-        String key = Config.RAWG_KEY.trim();
+        String key = BuildKeys.rawg().trim();
         if (key.isEmpty()) throw new IOException("no RAWG key");
         HttpURLConnection c = (HttpURLConnection) new URL(API + path + "&key=" + URLEncoder.encode(key, "UTF-8")).openConnection();
         final long t0 = android.os.SystemClock.uptimeMillis();

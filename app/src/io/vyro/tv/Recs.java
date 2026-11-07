@@ -3038,7 +3038,7 @@ final class Recs {
         int version = Prefs.version;
         if (version != keyVersion) {
             String given = Prefs.tmdbKey();
-            cachedKey = given.isEmpty() ? Config.TMDB_KEY.trim() : given;
+            cachedKey = given.isEmpty() ? BuildKeys.tmdb().trim() : given;
             keyVersion = version;
         }
         return cachedKey;
@@ -3048,7 +3048,7 @@ final class Recs {
         int version = Prefs.version;
         if (version != watchmodeKeyVersion) {
             String given = Prefs.watchmodeKey();
-            cachedWatchmodeKey = given.isEmpty() ? Config.WATCHMODE_KEY.trim() : given;
+            cachedWatchmodeKey = given.isEmpty() ? BuildKeys.watchmode().trim() : given;
             watchmodeKeyVersion = version;
         }
         return cachedWatchmodeKey;
