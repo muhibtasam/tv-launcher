@@ -212,22 +212,30 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
      */
     // 12 cards on one page, no scrolling: 6 columns by 3 rows. {column, row, columns wide, rows tall}: the large card,
     // 3 wide ones and 8 small ones; each row's wide card in another place, so the rows don't line up as stripes.
-    private static final int BENTO_COLS = 8;
+    private static final int BENTO_COLS = HomeNav.COLS;
     // Home: 10 picks as a mosaic in 8 columns × 2 rows (the large card, a tall one, two wide ones in different places and
     // six small ones), then Continue Watching below.
-    // With Continue Watching, a mosaic of 6 over 8 columns × 2 rows: the large landscape card, a poster, two wide cards
-    // stacked, two posters (posters: Recs.Pick.poster, moved onto the tall places by postersToTall).
-    private static final int[][] BENTO = {
-        {0, 0, 3, 2}, {3, 0, 1, 2}, {4, 0, 2, 1}, {4, 1, 2, 1}, {6, 0, 1, 2}, {7, 0, 1, 2},
-    };
+    // With Continue Watching, a mosaic of 12 over 8 columns × 2 rows: squares and wide cards only (8 squares, 4 wide),
+    // the wide ones in other places on each row. Squares: TMDB's text-free art (squareArt); wide: the apps' own art.
+    private static final int[][] BENTO = HomeNav.BENTO;   // Big Bento: 9 × 2, 13 cards (the large one first, focused)
+    private boolean sliding;   // updateCards for a slide: reorder only
+    private List<Recs.Pick> bentoPool = new ArrayList<>();
+    private int bentoShift;   // how far ← → slid the titles through the large card (0: as mixed; reset off the grid)
+    // The large card follows the focus (HomeNav.focusBento): which card, where; and the move between layouts.
+    private int bigCard = 0, bigCol = 0, bigRow = 0;
+    private final Spring bentoMorph = new Spring(0.3f, 1f, 1);
+    private RectF[] morphFrom = new RectF[0];
     /** Cards on Home: the Continue row's (0 to ContinueLogic.MAX, first in the list, drawn at the bottom) and the bento's. */
-    private static final int SLOTS = ContinueLogic.MAX + BENTO.length;
+    private static final int SLOTS = Math.max(ContinueLogic.MAX + BENTO.length, HomeNav.BENTO_FULL.length);   // either layout fits
     // With Continue Watching, one space between what you see: the tab row's bottom (174) and the bento, the bento and the
     // row's heading, the row and the dock's glass (910). The heading sits 24 above its cards (room for a focused card).
     // Home Design V1 (locked 2026-10-27): one 40 px space between the tab row's bottom (174), the bento (214, two rows
     // of 188), Continue Watching (654, 262 tall: its heading column, then four cards) and the dock's glass (its real top
     // is 956: DOCK_BOTTOM less the icon and its padding; measuring to 910 left an ~88 px gap). 24 px between all tiles.
-    private static final float V1_GAP = 24, V1_BENTO_TOP = 214, V1_BENTO_H = 400, V1_CONT_TOP = 654, V1_CONT_H = 262;
+    // VYRO 1.1: one 30 px space down the page, the greeting's to the tabs (baseline 88, tabs at 118): tabs (bottom 190)
+    // to the grid (220), the grid (404 tall) to Continue Watching's heading, its heading to its cards (CONT_HEAD), and
+    // the cards (bottom 926) to the dock's glass (956).
+    private static final float V1_GAP = 24, V1_BENTO_TOP = 220, V1_BENTO_H = 404, V1_CONT_TOP = 644, V1_CONT_H = 282;
     private static final float V1_CONT_COL = 296, V1_CONT_COL_GAP = 32;
     private float contHeadBase;   // Continue Watching's top (layoutBento)
     /** How many of the cards are the Continue row's (Home only; 0: the bento has the whole area). */
@@ -1318,6 +1326,10 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         boolean statusMoving = step(statusFocus, dt);
         boolean heroMoving = heroFocus.step(dt);
         boolean topMoving = step(topFocus, dt) | stepTabs(dt), cardsMoving = step(cardFocus, dt) | stepFeed(dt);
+        if (bentoMorph.step(dt)) {   // the large card moving to the focus
+            cardsMoving = true;
+            heroMoving = true;
+        }
         if (contScroll.step(dt)) {   // Continue Watching sliding along
             if (contShown > 0) layoutContRow(contShown);
             cardsMoving = true;
@@ -2464,6 +2476,39 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
      * cards and dock always match. Null while it's made (once, in the background; the cards redraw when it's ready)
      * and for a service with no bundled icon (its card then names it instead).
      */
+    private final Map<String, Bitmap> appIcons = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Set<String> appIconPending = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+
+    /**
+     * A card's round icon: its service's (Netflix, Prime…); a Continue Watching title from another app with no service
+     * known (Stremio, Nuvio…): that app's own icon, read once off the main thread.
+     */
+    private Bitmap cardIcon(Recs.Pick p) {
+        Bitmap s = serviceIcon(p.app);
+        if (s != null || !"watchnext".equals(p.kind) || p.pkg == null) return s;
+        Bitmap own = appIcons.get(p.pkg);
+        if (own == null && appIconPending.add(p.pkg)) {
+            final String pkg = p.pkg;
+            final Context ctx = getContext().getApplicationContext();
+            LOADER.execute(() -> {
+                try {
+                    android.graphics.drawable.Drawable d = ctx.getPackageManager().getApplicationIcon(pkg);
+                    Bitmap b = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888);
+                    Canvas cv = new Canvas(b);
+                    d.setBounds(0, 0, 96, 96);
+                    d.draw(cv);
+                    appIcons.put(pkg, b);
+                    handler.post(() -> {
+                        heroDirty = true;
+                        wake();
+                    });
+                } catch (Exception ignored) {
+                }
+            });
+        }
+        return own;
+    }
+
     private Bitmap serviceIcon(String app) {
         if (app == null || "other".equals(app)) return null;
         Bitmap[] pair = HomeApps.serviceIcons(app);
@@ -4727,8 +4772,13 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
      * the card stays focusable and navigation is untouched.
      */
     private void launchTitle(String kind, int id, String shown, RectF from, Recs.Pick pick) {
-        if (pick != null && "app".equals(pick.kind)) {   // a title an app published: its own link, inside that app only
+        if (pick != null && ("app".equals(pick.kind) || "watchnext".equals(pick.kind))) {   // an app's own title: its own link, in that app
             Intent own = AppContent.intent(getContext(), pick.link, pick.pkg);
+            if (own == null && "watchnext".equals(pick.kind) && pick.pkg != null) {   // Continue Watching: at least its app
+                own = getContext().getPackageManager().getLeanbackLaunchIntentForPackage(pick.pkg);
+                if (own == null) own = getContext().getPackageManager().getLaunchIntentForPackage(pick.pkg);
+                if (own != null) own.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            }
             if (own == null) {
                 Startup.event("OK on " + pick.title + " (" + pick.pkg + "): its link isn't opened (refused or no activity)");
                 return;
@@ -8197,6 +8247,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         // No Continue row: 11 tiles in 3 rows over the whole area (10 when only 10 picks came); with it, 10 in 2 rows.
         int[][] lay = cont == 0 && (count <= 0 || count >= HomeNav.BENTO_FULL.length) ? HomeNav.BENTO_FULL : BENTO;
         int layRows = lay == HomeNav.BENTO_FULL ? 3 : 2;
+        if (bigCard > 0 && bigCard < lay.length && count >= lay.length) lay = HomeNav.focusBento(BENTO_COLS, layRows, lay.length, bigCard, bigCol, bigRow);
         bentoN = lay.length;
         float colW = (width - (BENTO_COLS - 1) * g) / BENTO_COLS, rowH = (height - (layRows - 1) * g) / layRows;
         if (count <= 0 || count >= lay.length) {   // the whole bento (none yet: its skeletons' places)
@@ -8204,7 +8255,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 int[] b = lay[j];
                 float x = left + b[0] * (colW + g), y = top + b[1] * (rowH + g);
                 cardRects[cont + j].set(x, y, x + b[2] * colW + (b[2] - 1) * g, y + b[3] * rowH + (b[3] - 1) * g);
-                bentoBig[cont + j] = b[2] >= 3 && b[3] == 2;
+                bentoBig[cont + j] = b[2] >= 2 && b[3] == 2;
+                if (bentoBig[cont + j]) { bigCol = b[0]; bigRow = b[1]; }
             }
             return;
         }
@@ -8224,11 +8276,11 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
 
     // Continue Watching's row: 16:9 cards from the heading column on, sliding like For You's rows (contScroll, in px).
     private final Spring contScroll = new Spring(0.26f, 1f, 0);
-    private static final float CONT_HEAD = 58;   // For You's row heading above the cards (drawMovieHeading)
+    private static final float CONT_HEAD = 68, CONT_CARD_H = 214;   // heading baseline (top + 38) + 30; cards end at 926   // For You's heading-to-cards space; small 16:9 cards
     private float contX0;
 
     private void layoutContRow(int cont) {
-        float g = V1_GAP * k, ct = (V1_CONT_TOP + CONT_HEAD) * k, ch = (V1_CONT_H - CONT_HEAD) * k, cw = ch * 16f / 9f;
+        float g = V1_GAP * k, ct = (V1_CONT_TOP + CONT_HEAD) * k, ch = CONT_CARD_H * k, cw = ch * 16f / 9f;
         contX0 = MARGIN * k;
         for (int i = 0; i < cont && i < cardRects.length; i++) {
             float x = contX0 + i * (cw + g) - contScroll.value;
@@ -8241,7 +8293,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private void aimContScroll(boolean snap) {
         float target = 0;
         if (tab == 0 && bento() && contShown > 0 && zone == Z_CARDS && cardIndex < contShown) {
-            float g = V1_GAP * k, cw = (V1_CONT_H - CONT_HEAD) * k * 16f / 9f, right = CONTENT_R * k;
+            float g = V1_GAP * k, cw = CONT_CARD_H * k * 16f / 9f, right = CONTENT_R * k;
             float max = Math.max(0, contX0 + contShown * (cw + g) - g - right);
             float left = contX0 + cardIndex * (cw + g);
             target = contScroll.target;
@@ -8258,10 +8310,145 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
     }
 
+    /**
+     * The large card follows the focus on Home's grid: the focused card becomes 2 × 2 where it is, the one before goes
+     * back to one cell; off the grid (tabs, dock) the first is large again. The cards move there (bentoMorph).
+     */
+    private void aimBigCard(boolean snap) {
+        if (tab != 0 || !bento() || cards.size() <= contShown) return;
+        int want = zone == Z_CARDS && cardIndex >= contShown ? cardIndex - contShown : 0;   // elsewhere: the first
+        if (want == bigCard) return;
+        int n = cards.size();
+        if (morphFrom.length < n) {
+            morphFrom = new RectF[n];
+            for (int i = 0; i < n; i++) morphFrom[i] = new RectF();
+        }
+        for (int i = 0; i < n && i < cardRects.length; i++) morphFrom[i].set(shownRect(i));
+        int[][] lay = contShown == 0 ? HomeNav.BENTO_FULL : BENTO;
+        if (want < lay.length && cardRects.length > contShown + want) {   // the card's cell: the large card's place
+            RectF at = cardRects[contShown + want];
+            float g = V1_GAP * k, colW = ((CONTENT_R - MARGIN) * k - (BENTO_COLS - 1) * g) / BENTO_COLS;
+            bigCol = Math.round((at.left - MARGIN * k) / (colW + g));
+            bigRow = Math.round((at.top - V1_BENTO_TOP * k) / (Math.max(1, at.height()) + g));
+            if (want == 0) { bigCol = 0; bigRow = 0; }
+        }
+        bigCard = want;
+        layoutBento(n);
+        if (snap) bentoMorph.snap(1);
+        else {
+            bentoMorph.snap(0);
+            bentoMorph.target = 1;
+        }
+        heroDirty = true;
+    }
+
+    /**
+     * ← → on Home's grid: the next (or previous) title slides into the large, focused card, the others move along a
+     * place (bentoMorph), the one it replaces goes to the end of the list; a new one slides in at the last place.
+     */
+    private void slideBento(int dx) {
+        Map<String, RectF> was = new HashMap<>();
+        for (int i = contShown; i < cards.size() && i < cardRects.length; i++) was.put(Recs.key(cards.get(i)), new RectF(shownRect(i)));
+        bentoShift += dx;
+        sliding = true;
+        try {
+            updateCards();   // the same titles, in their new order (from memory: no fetch)
+        } finally {
+            sliding = false;
+        }
+        int n = cards.size();
+        if (morphFrom.length < n) {
+            RectF[] m = new RectF[n];
+            for (int i = 0; i < n; i++) m[i] = i < morphFrom.length ? morphFrom[i] : new RectF();
+            morphFrom = m;
+        }
+        for (int i = contShown; i < n && i < cardRects.length; i++) {
+            RectF from = was.get(Recs.key(cards.get(i)));
+            if (from != null) morphFrom[i].set(from);
+            else {
+                morphFrom[i].set(cardRects[i]);
+                morphFrom[i].offset(dx * (cardRects[i].width() + V1_GAP * k), 0);
+            }
+        }
+        for (int i = 0; i < contShown && i < n; i++) morphFrom[i].set(cardRects[i]);
+        bentoMorph.snap(0);
+        bentoMorph.target = 1;
+        cardIndex = contShown;
+        click.move();
+        heroDirty = true;
+        wake();
+    }
+
+    /** Each title the grid slides through, its art at both sizes asked for once now: a slide then finds it ready. */
+    private void prefetchSlideArt() {
+        if (bentoPool.isEmpty() || cardRects.length <= contShown + 1) return;
+        RectF big = cardRects[contShown], small = cardRects[contShown + 1];
+        if (big.width() <= 0 || small.width() <= 0) return;
+        for (Recs.Pick p : bentoPool) {
+            squareArt(p, small.width(), small.height());   // the poster (narrow cards), downloaded once to the disk cache
+            squareArt(p, big.width(), big.height());
+        }
+    }
+
+    private final Paint fadePaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+    private final Rect fadeSrc = new Rect();
+
+    /**
+     * While a slide moves a card between a narrow place (poster) and a wide one (landscape art): its art from before,
+     * over its new card, fading out as it arrives (bentoMorph), so the picture changes softly. Only those cards; one
+     * bitmap draw each from pictures already in memory (no layer, no allocation).
+     */
+    private void drawShapeFade(Canvas c, int i, Recs.Pick p, Backdrop b) {
+        if (i >= morphFrom.length) return;
+        RectF from = morphFrom[i], to = cardRects[i];
+        if (from.width() <= 0 || to.width() <= 0) return;
+        boolean wasNarrow = from.width() / from.height() < 0.95f, isNarrow = to.width() / to.height() < 0.95f;
+        if (wasNarrow == isNarrow) return;
+        Bitmap old = wasNarrow ? squareArt(p, from.width(), from.height()) : b == null ? null : b.frame != null ? b.frame : b.wide;
+        if (old == null) return;
+        float iw = old.getWidth(), ih = old.getHeight(), want = to.width() / to.height();
+        if (iw / ih > want) {
+            float sw = ih * want;
+            fadeSrc.set(Math.round((iw - sw) / 2), 0, Math.round((iw + sw) / 2), Math.round(ih));
+        } else {
+            float sh = iw / want;
+            fadeSrc.set(0, Math.round((ih - sh) * 0.4f), Math.round(iw), Math.round((ih - sh) * 0.4f + sh));
+        }
+        fadePaint.setAlpha(Math.round(255 * (1 - Ui.clamp(bentoMorph.value))));
+        c.save();
+        clip.reset();
+        clip.addRoundRect(to, cardRadius(i), cardRadius(i), Path.Direction.CW);
+        c.clipPath(clip);
+        c.drawBitmap(old, fadeSrc, to, fadePaint);
+        c.restore();
+    }
+
+    private final RectF shownTmp = new RectF();
+
+    /** Where a grid card is drawn now: between its place before the move and its place now (bentoMorph). */
+    private RectF shownRect(int i) {
+        float v = bentoMorph.value;
+        if (v >= 1 || i >= morphFrom.length || i < contShown) return cardRects[i];
+        RectF a = morphFrom[i], b = cardRects[i];
+        shownTmp.set(a.left + (b.left - a.left) * v, a.top + (b.top - a.top) * v, a.right + (b.right - a.right) * v, a.bottom + (b.bottom - a.bottom) * v);
+        return shownTmp;
+    }
+
     /** A card, Continue Watching's kept to its row (left of it is the heading column). */
     private void drawBentoCardInRow(Canvas c, int i) {
         if (i >= contShown) {
+            if (bentoMorph.value >= 1 || i >= morphFrom.length) {
+                drawBentoCard(c, i);
+                return;
+            }
+            // Moving to its new place: drawn at the new size (its cached picture), mapped onto where it is now.
+            RectF to = cardRects[i], now = shownRect(i);
+            c.save();
+            c.translate(now.left, now.top);
+            c.scale(now.width() / Math.max(1, to.width()), now.height() / Math.max(1, to.height()));
+            c.translate(-to.left, -to.top);
             drawBentoCard(c, i);
+            c.restore();
             return;
         }
         if (cardRects[i].right < 0 || cardRects[i].left > w) return;   // off screen: not drawn
@@ -8297,13 +8484,15 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 inRow.add(Recs.key(p));
                 if (p.title != null) inRow.add("t:" + p.title.trim().toLowerCase(java.util.Locale.ROOT));   // Watch Next's entries by name
             }
-            List<Recs.Pick> all = new ArrayList<>(cont);
+            List<Recs.Pick> all = new ArrayList<>(cont), rest = new ArrayList<>();
             for (Recs.Pick p : list) {
                 boolean shown = inRow.contains(Recs.key(p)) || (p.title != null && inRow.contains("t:" + p.title.trim().toLowerCase(java.util.Locale.ROOT)));
-                if (all.size() < cont.size() + (cont.isEmpty() ? HomeNav.BENTO_FULL.length : BENTO.length) && !shown) all.add(p);
+                if (!shown) rest.add(p);
             }
+            bentoPool = new ArrayList<>(rest);   // every title the grid slides through: kept in memory, loaded once
+            if (!rest.isEmpty() && bentoShift != 0) java.util.Collections.rotate(rest, -Math.floorMod(bentoShift, rest.size()));   // slid along
+            for (Recs.Pick p : rest) if (all.size() < cont.size() + (cont.isEmpty() ? HomeNav.BENTO_FULL.length : BENTO.length)) all.add(p);
             list = all;
-            postersToTall(list, cont.size());
         }
         int contBefore = contShown;
         contShown = cont.size();
@@ -8318,7 +8507,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         bentoLines = lines;
         bentoChips = chips;
         bentoLinesGeneration = Ui.generation;
-        requestTitleLinks();
+        if (!sliding) requestTitleLinks();   // a slide only reorders the same titles: nothing to look up
         if (!list.isEmpty()) Startup.mark("recommendations shown");
         if (!samePicks(list, cards) || contBefore != contShown) {
             closeContMenu();   // its card may have moved or gone
@@ -8331,8 +8520,19 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             }
         }
         // This tab's images (all three tabs' 30 don't fit in memory together; the others load when you switch).
-        if (tab == 0) recs.setPinned(list);   // Home's cards stay in memory while you're in For You or an app
-        for (Recs.Pick p : list) recs.backdrop(p);
+        if (tab == 0) {   // Home's cards, and every title the grid slides through, stay in memory (loaded once)
+            List<Recs.Pick> keep = new ArrayList<>(list);
+            for (Recs.Pick p : bentoPool) if (!keep.contains(p)) keep.add(p);
+            recs.setPinned(keep);
+            for (Recs.Pick p : keep) recs.backdrop(p);
+            if (!sliding) prefetchSlideArt();
+        } else {
+            for (Recs.Pick p : list) recs.backdrop(p);
+        }
+        if (sliding) {   // the same titles moved: no new background or links
+            heroDirty = true;
+            return;
+        }
         if (moodsOn()) {
             refreshBackground();
             return;
@@ -8901,7 +9101,6 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         wake();
     }
 
-    /** The update sheet, once per version, only on the home screen at rest (nothing open, nothing moving, no key for 2 s). */
     /** Home's grid mixes again every hour (Recs.mixSeed: Indian, Hollywood or both first); not under a moving remote. */
     private final Runnable hourlyMix = new Runnable() {
         @Override public void run() {
@@ -8919,6 +9118,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         return 3600_000L - System.currentTimeMillis() % 3600_000L + 5_000L;
     }
 
+    /** The update sheet, once per version, only on the home screen at rest (nothing open, nothing moving, no key for 2 s). */
     private final Runnable offerUpdate = new Runnable() {
         @Override public void run() {
             if (!running) return;
@@ -9192,7 +9392,10 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             c.saveLayerAlpha(base.left - 4 * k, base.top - 4 * k, base.right + 4 * k, base.bottom + 4 * k, Math.round(255 * reveal));
         }
         if (reveal < 1 || !drawBentoPlate(c, i, p, b, true)) paintBentoCard(c, i, p, b, false);
-        drawCardTitle(c, i, p, f);   // over the cached card: it rests at the bottom and rises with focus
+        if (bentoMorph.value < 1 && i >= contShown) drawShapeFade(c, i, p, b);   // poster ↔ landscape, while sliding
+        boolean resumeCard = i < contShown;   // Continue Watching: art only at rest; shade, icon, bar and name on focus
+        if (resumeCard && f > 0.01f) drawResumeChrome(c, i, p, f);
+        if (!resumeCard || f > 0.01f) drawCardTitle(c, i, p, f);   // over the cached card: it rests at the bottom and rises with focus
         if (f > 0.01f) drawCardDetails(c, i, f * reveal);
         if (reveal < 1) c.restore();   // the fade-in layer
         c.restore();
@@ -9217,27 +9420,45 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         return (i < contShown ? 24 : 20) * k;
     }
 
-    /** A tall Home card's poster at its size (Discover's picture cache), or null: none, or not ready yet. */
-    private Bitmap posterFor(Recs.Pick p, float bw, float bh) {
-        if (p == null || p.poster == null || p.poster.isEmpty() || bw / bh > 0.8f) return null;
-        return Discover.get(getContext()).card(p.poster, false, Math.round(bw), Math.round(bh), -1);
+    /**
+     * A square Home card's art: an app's title (its own art carries its name and badge, which a square crop cuts) shows
+     * TMDB's text-free backdrop of it instead, sized by Discover's picture cache; null: none known, or not ready yet.
+     */
+    private Bitmap squareArt(Recs.Pick p, float bw, float bh) {
+        if (p == null) return null;
+        // A narrow card (taller than wide): the title's poster, as For You's tall cards.
+        if (bw / bh < 0.95f && p.poster != null && !p.poster.isEmpty())
+            return Discover.get(getContext()).card(p.poster, false, Math.round(bw), Math.round(bh), -1);
+        if (!"app".equals(p.kind) || p.clean == null || p.clean.isEmpty() || bw / bh > 1.4f) return null;
+        return Discover.get(getContext()).card(p.clean, true, Math.round(bw), Math.round(bh), -1);
     }
 
-    /** Titles with a poster onto the mosaic's tall places (else they show an app's landscape art whole, over a blur). */
-    private void postersToTall(List<Recs.Pick> list, int cont) {
-        int[][] lay = cont == 0 ? HomeNav.BENTO_FULL : BENTO;
-        for (int j = 0; j < lay.length && cont + j < list.size(); j++) {
-            if (lay[j][2] != 1 || lay[j][3] != 2 || hasPoster(list.get(cont + j))) continue;
-            for (int m = 0; m < lay.length && cont + m < list.size(); m++) {
-                if ((lay[m][2] == 1 && lay[m][3] == 2) || !hasPoster(list.get(cont + m))) continue;
-                java.util.Collections.swap(list, cont + j, cont + m);
-                break;
-            }
+    /** A focused Continue card's shade, app icon and progress bar, fading in with the focus `f`. */
+    private void drawResumeChrome(Canvas c, int i, Recs.Pick p, float f) {
+        RectF base = cardRects[i];
+        int layer = c.saveLayerAlpha(base.left, base.top, base.right, base.bottom, Math.round(255 * f));
+        clip.reset();
+        clip.addRoundRect(base, cardRadius(i), cardRadius(i), Path.Direction.CW);
+        c.clipPath(clip);
+        if (bentoShades[i] != null) {
+            shadeMatrix.setTranslate(0, base.top);
+            bentoShades[i].setLocalMatrix(shadeMatrix);
+            fill.setColor(0xFF000000);
+            fill.setShader(bentoShades[i]);
+            c.drawRect(base, fill);
+            fill.setShader(null);
         }
-    }
-
-    private static boolean hasPoster(Recs.Pick p) {
-        return p != null && p.poster != null && !p.poster.isEmpty();
+        Bitmap art = cardIcon(p);
+        float pad = 20 * k;
+        if (art != null) drawRoundIcon(c, art, base.left + pad, base.top + pad, 40 * k);
+        if (p.progress > 0) {   // how far in (Watch Next's place): a thin ivory bar along the bottom
+            float y = base.bottom - 4 * k;
+            fill.setColor(0x40FFFFFF);
+            c.drawRect(base.left, y, base.right, base.bottom, fill);
+            fill.setColor(0xFFF3EDE2);
+            c.drawRect(base.left, y, base.left + base.width() * Math.min(1, p.progress), base.bottom, fill);
+        }
+        c.restoreToCount(layer);
     }
 
     private final Map<Bitmap, Bitmap> softCopies = new java.util.WeakHashMap<>();
@@ -9267,10 +9488,10 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         Bitmap img = b == null ? null : b.frame != null ? b.frame : b.wide;
         float lose = img == null ? 0 : img.getWidth() / (float) img.getHeight() > bw / bh
                 ? 1 - (bw / bh) / (img.getWidth() / (float) img.getHeight()) : 1 - (img.getWidth() / (float) img.getHeight()) / (bw / bh);
-        Bitmap poster = posterFor(p, bw, bh);
-        if (poster != null) {   // a tall place: the title's poster (For You's tall cards), whole height
-            c.drawBitmap(poster, null, base, bitmapPaint);
-        } else if (img != null && "app".equals(p.kind) && lose > 0.3f) {
+        Bitmap square = squareArt(p, bw, bh);
+        if (square != null) {   // a square: the title's text-free TMDB art, cropped by Discover to the card
+            c.drawBitmap(square, null, base, bitmapPaint);
+        } else if (false && img != null) {   // (whole art over a blur: off, the art always fills the card)
             // An app's cover art (its title and logo are part of it) on a tile of another shape: the whole picture, over a
             // soft darkened copy of itself filling the tile, rather than a crop that cuts its title in half.
             Bitmap soft = softCopy(img);
@@ -9310,20 +9531,16 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
         shadeMatrix.setTranslate(0, base.top);
         bentoShades[i].setLocalMatrix(shadeMatrix);
-        fill.setColor(0xFF000000);
-        fill.setShader(bentoShades[i]);
-        c.drawRect(base, fill);
-        fill.setShader(null);
-        float pad = (resume ? 20 : 16) * k, iconD = (big ? 48 : resume ? 40 : 36) * k;
-        Bitmap art = serviceIcon(p.app);
-        if (art != null) drawRoundIcon(c, art, base.left + pad, base.top + pad, iconD);
-        String chip = i < bentoChips.length ? bentoChips[i] : "";
-        if (!resume && chip != null && !chip.isEmpty()) {   // the chip at rest too (Prime's own badge, cut from its art)
-            feedPaints();
-            float cx = base.left + pad + iconD + 12 * k;
-            if (cx + 28 * k + feedChip.measureText(chip) <= base.right - pad) bentoChip(c, cx, base.top + pad + iconD / 2, chip);
+        if (!resume) {   // Continue Watching's shade comes with the focus (drawResumeChrome)
+            fill.setColor(0xFF000000);
+            fill.setShader(bentoShades[i]);
+            c.drawRect(base, fill);
+            fill.setShader(null);
         }
-        if (withTitle) drawCardTitle(c, i, p, 0);
+        float pad = (resume ? 20 : 16) * k, iconD = (big ? 48 : resume ? 40 : 36) * k;
+        Bitmap art = cardIcon(p);
+        if (art != null) drawRoundIcon(c, art, base.left + pad, base.top + pad, iconD);   // Continue Watching's too, at rest
+        if (withTitle && !resume) drawCardTitle(c, i, p, 0);
         c.restore();
     }
 
@@ -9337,7 +9554,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         float pad = (resume ? 20 : 16) * k, iconD = (big ? 48 : resume ? 40 : 36) * k;
         int a = Math.round(255 * f);
         String chip = i < bentoChips.length ? bentoChips[i] : "";
-        if (false && !resume && chip != null && !chip.isEmpty()) {   // drawn with the card at rest now (paintBentoCard)
+        if (!resume && chip != null && !chip.isEmpty() && chipFits(base, pad + iconD + 12 * k, chip)) {   // on focus only
             feedPaints();
             int c0 = c.saveLayerAlpha(base.left, base.top, base.right, base.top + 2 * pad + iconD, a);
             bentoChip(c, base.left + pad + iconD + 12 * k, base.top + pad + iconD / 2, chip);
@@ -9565,12 +9782,13 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         h = 31 * h + (i < bentoLines.length && bentoLines[i] != null ? bentoLines[i].hashCode() : 0);
         h = 31 * h + (i < bentoChips.length && bentoChips[i] != null ? bentoChips[i].hashCode() : 0);
         h = 31 * h + (p.app == null ? 0 : p.app.hashCode());
-        h = 31 * h + System.identityHashCode(posterFor(p, base.width(), base.height()));
+        h = 31 * h + System.identityHashCode(squareArt(p, base.width(), base.height()));
+        h = 31 * h + Float.floatToIntBits(p.progress);
         h = 31 * h + Float.floatToIntBits(base.width());
         h = 31 * h + Float.floatToIntBits(base.height());
         h = 31 * h + Float.floatToIntBits(k);
         h = 31 * h + (big ? 1 : 0) + (resume ? 2 : 0) + (dark() > 0.5f ? 4 : 0);
-        Bitmap art = serviceIcon(p.app);   // the icon: a plain one first, the crisp one when ready
+        Bitmap art = cardIcon(p);   // the icon: a plain one first, the crisp one when ready
         h = 31 * h + System.identityHashCode(art);
         if (art != null) {
             int size = Math.round((big ? 48 : resume ? 40 : 36) * k);
@@ -9589,6 +9807,12 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     }
 
     /** A card's chip: dark glass so it reads on bright artwork too (Games' lighter chip sits on the plain background). */
+    /** The chip fits the card beside its icon (`from`: its start from the card's left), with the card's padding after. */
+    private boolean chipFits(RectF base, float from, String text) {
+        feedPaints();
+        return from + 28 * k + feedChip.measureText(text) <= base.width() - 16 * k;
+    }
+
     private void bentoChip(Canvas c, float x, float cy, String text) {
         float h = 34 * k, pad = 14 * k, cw = pad + feedChip.measureText(text) + pad;
         glassTmp.set(x, cy - h / 2, x + cw, cy + h / 2);
@@ -9701,6 +9925,10 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 if (tab == FOR_YOU_TAB) {
                     if (!moveFeed(dx, dy)) return true;
                     break;
+                }
+                if (bento() && tab == 0 && cardIndex >= contShown && dx != 0 && dy == 0) {
+                    slideBento(dx);   // the large card keeps the focus: the titles slide through it
+                    return true;
                 }
                 if (bento()) {
                     int next = bentoMove(cardIndex, dx, dy);

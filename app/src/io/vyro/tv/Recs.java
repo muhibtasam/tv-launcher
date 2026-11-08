@@ -60,7 +60,9 @@ final class Recs {
         int season;             // shows: the season airing now or last aired (0 = unknown)
         String seasonName = ""; // that season's own name, when it has one beyond "Season 3"
         String want;            // fetched for this service (Explore's per-service picks): preferred when it streams there
-        String poster = "";     // TMDB's poster path (Home's tall places), when known
+        String poster = "";     // TMDB's poster path, when known
+        float progress;         // Watch Next: how far in (0..1), 0 = unknown
+        String clean = "";      // an app's title: TMDB's text-free backdrop path (Home's square cards), when known
         String badge = "";      // Prime Video's own badge words ("NEW MOVIE"), drawn as Home's chip (its art is cleaned of it)
         int top10;              // Netflix's Top 10 place (1..10) on Home's Netflix tiles, 0 = none
         int label;              // What's New: ArrivalsLogic.NEW_ON / PREMIERE / NEW_SEASON / NEW_EPISODE, or NONE (no chip)
@@ -233,7 +235,9 @@ final class Recs {
      *  these); each service gets room for MixLogic.perService titles (at least HOME_PER_SERVICE) in the pool the mix draws from. */
     static final int HOME_DETAILED = 40, HOME_PER_SERVICE = 8;
     /** Titles in the grid: the largest bento (11, HomeNav.BENTO_FULL) plus the Continue row's titles it may skip (4). */
-    static final int HOME_GRID = 15;
+    static final int HOME_GRID = 20;
+    /** Bumped when the mix's rules change: Home mixes again at once. */
+    static final int MIX_RULES = 3;   // Home without Continue Watching: 20 cards (4 of them Netflix's)
     /** A new list whose candidates still lack details after this long is published with the ones that have them. */
     private static final long HOME_WAIT = 10 * 60_000L;
     /** 1: the list has the Movies tab's extra movies. An older one (0) is fetched again once; Explore's stays. */
@@ -381,7 +385,8 @@ final class Recs {
                 items.add(new MixLogic.Item(key(p), p.app, MixLogic.priority(mood, langOf(p), n <= 4)));   // the hour's kind, then an app's own first few
             }
             List<Pick> made = new ArrayList<>();
-            for (int i : MixLogic.pick(items, HOME_GRID, mix)) made.add(pool.get(i));
+            // At least 3 Crunchyroll titles among the first 9 app cards (beside Continue Watching): any hour's mix.
+            for (int i : MixLogic.atLeast(MixLogic.pick(items, HOME_GRID, mix), items, "crunchyroll", 3, 9, mix)) made.add(pool.get(i));
             if (!made.isEmpty()) {
                 homeGrid = grid = made;
                 homeSeed = mix;
@@ -397,6 +402,7 @@ final class Recs {
         for (Pick p : grid) {
             if (out.size() >= max) break;
             if (p.pkg != null && have.computeIfAbsent(p.pkg, this::installed)) {
+                if ("app".equals(p.kind) && p.clean.isEmpty()) p.clean = cache.getString("bd2:" + AppContentLogic.normTitle(langName(p.title)), "");
                 if ("app".equals(p.kind) && p.poster.isEmpty()) p.poster = cache.getString("poster:" + AppContentLogic.normTitle(langName(p.title)), "");
                 out.add(p);
             }
@@ -419,7 +425,7 @@ final class Recs {
     private static final long NETFLIX_EVERY = 12 * 3600_000L, NETFLIX_RETRY = 30 * 60_000L;
     private static final int[] NETFLIX_SLOTS = {1, 3, 5, 7};
     private static final int NETFLIX_PROVIDER = 8;   // TMDB's id for Netflix
-    private final ExecutorService netflixIo = lowPriority(1);
+    private final ExecutorService netflixIo = arrivalsIo;   // its own work shares the arrivals thread: no extra thread
     private final java.util.concurrent.atomic.AtomicBoolean netflixRunning = new java.util.concurrent.atomic.AtomicBoolean();
     private volatile List<Pick> netflixPool;   // null: not read from the cache yet
     private volatile long netflixTriedAt;
@@ -440,7 +446,7 @@ final class Recs {
                     if (!netflixPool.isEmpty()) post(done);
                 }
                 long now = System.currentTimeMillis();
-                if (now - cache.getLong("nf:at5", 0) < NETFLIX_EVERY && !netflixPool.isEmpty()) return;
+                if (now - cache.getLong("nf:at6", 0) < NETFLIX_EVERY && !netflixPool.isEmpty()) return;
                 if (now - netflixTriedAt < NETFLIX_RETRY) return;
                 netflixTriedAt = now;
                 List<Pick> made = fetchNetflix(pkg);
@@ -451,8 +457,8 @@ final class Recs {
                     a.put(new JSONObject().put("id", p.id).put("kind", p.kind).put("title", p.title).put("backdrop", p.backdrop)
                             .put("new", p.label == ArrivalsLogic.NEW_ON).put("top10", p.top10).put("lang", p.lang == null ? "" : p.lang).put("poster", p.poster));
                 }
-                cache.edit().putString("nf:pool", a.toString()).putLong("nf:at5", netflixTopRead ? now : 0).apply();
-                AppLog.w("netflix: pool of " + made.size() + (netflixTopRead ? "" : " (no Top 10 yet)"));
+                cache.edit().putString("nf:pool", a.toString()).putLong("nf:at6", netflixTopRead ? now : 0).apply();
+                AppLog.w("netflix: pool of " + made.size() + " for " + REGION + (netflixTopRead ? "" : " (no Top 10 yet)"));
                 post(done);
             } catch (Exception e) {
                 AppLog.w("netflix: " + e.getMessage());
@@ -499,7 +505,7 @@ final class Recs {
         List<NetflixLogic.Title> top = new ArrayList<>();
         netflixTopRead = false;
         try {
-            String tsv = httpText(NETFLIX_TOP10);
+            String tsv = netflixTsv();
             top = NetflixLogic.top10(tsv, REGION);
             if (top.isEmpty()) top = NetflixLogic.top10(tsv, "ZZ");   // a country Netflix doesn't rank: the global list
             netflixTopRead = !top.isEmpty();
@@ -509,10 +515,19 @@ final class Recs {
         Map<String, Pick> byName = new HashMap<>();
         List<NetflixLogic.Title> found = new ArrayList<>();
         for (NetflixLogic.Title t : top) {
-            String kind = t.kind == NetflixLogic.MOVIE ? "movie" : "tv";
-            JSONArray r = get("/search/" + kind + "?query=" + URLEncoder.encode(t.name, "UTF-8")).optJSONArray("results");
+            String kind = t.kind == NetflixLogic.MOVIE ? "movie" : "tv", sk = "nfs:" + kind + ":" + NetflixLogic.norm(t.name);
             List<Pick> l = new ArrayList<>();
-            for (int i = 0; r != null && i < r.length() && l.isEmpty(); i++) add(l, r.getJSONObject(i), kind);
+            String saved = cache.getString(sk, null);   // each Top 10 title is looked up on TMDB once, then kept
+            if (saved != null) {
+                if (!saved.isEmpty()) add(l, new JSONObject(saved), kind);
+            } else {
+                JSONArray r = get("/search/" + kind + "?query=" + URLEncoder.encode(t.name, "UTF-8")).optJSONArray("results");
+                for (int i = 0; r != null && i < r.length() && l.isEmpty(); i++) {
+                    add(l, r.getJSONObject(i), kind);
+                    if (!l.isEmpty()) cache.edit().putString(sk, r.getJSONObject(i).toString()).apply();
+                }
+                if (l.isEmpty()) cache.edit().putString(sk, "").apply();
+            }
             if (l.isEmpty()) continue;
             Pick tp = netflixPick(l.get(0).id, kind, t.name, l.get(0).backdrop, false, t.rank, pkg);
             tp.lang = l.get(0).lang;
@@ -566,7 +581,7 @@ final class Recs {
 
     /** The seed of Home's mix: the apps' list, the hour (a new mix every hour) and the languages known. */
     long mixSeed() {
-        return appSeed * 31 + System.currentTimeMillis() / 3600_000L + langStamp * 7919L;
+        return appSeed * 31 + System.currentTimeMillis() / 3600_000L + langStamp * 7919L + HOME_GRID * 104729L + MIX_RULES * 1299709L;
     }
 
     /** A title's original language: its own (TMDB, Crunchyroll's anime), else the one looked up for its name (fillLangs). */
@@ -586,6 +601,59 @@ final class Recs {
         return title.replaceAll("(?i)\\s*[-:]\\s*season\\s*\\d+.*$", "").replaceAll("\\s*\\([^)]*\\)\\s*", " ").trim();
     }
 
+    /**
+     * For Continue Watching's titles from other apps (Stremio, Nuvio…): the streaming service each is on in this
+     * region (TMDB's watch providers, by subscription), once per title, kept: its icon goes on the card.
+     */
+    private void watchProviders(List<Pick> titles, Runnable done) {
+        if (readKey() == null || titles == null) return;
+        netflixIo.execute(() -> {
+            int found = 0;
+            for (Pick p : titles) {
+                if (!"watchnext".equals(p.kind) || serviceOf(p.pkg) != null) continue;
+                String name = langName(p.title), key = "prov:" + AppContentLogic.normTitle(name);
+                if (name.isEmpty() || cache.contains(key)) continue;
+                String on = "-";
+                try {
+                    // The id fillLangs found (same thread, run first): no second search; else search now.
+                    String tm = cache.getString("tm:" + AppContentLogic.normTitle(name), null);
+                    JSONArray r;
+                    if (tm != null && tm.matches("(movie|tv):\\d+")) {
+                        r = new JSONArray().put(new JSONObject().put("media_type", tm.substring(0, tm.indexOf(':')))
+                                .put("id", Integer.parseInt(tm.substring(tm.indexOf(':') + 1))));
+                    } else {
+                        r = get("/search/multi?query=" + URLEncoder.encode(name, "UTF-8")).optJSONArray("results");
+                    }
+                    for (int i = 0; r != null && i < r.length(); i++) {
+                        JSONObject o = r.getJSONObject(i);
+                        String type = o.optString("media_type");
+                        if (!type.equals("movie") && !type.equals("tv")) continue;
+                        JSONObject all = get("/" + type + "/" + o.optInt("id") + "/watch/providers").optJSONObject("results");
+                        for (String region : new String[] {REGION, "IN", "US"}) {
+                            JSONObject at = all == null ? null : all.optJSONObject(region);
+                            JSONArray flat = at == null ? null : at.optJSONArray("flatrate");
+                            for (int j = 0; flat != null && j < flat.length() && "-".equals(on); j++) {
+                                String n = flat.getJSONObject(j).optString("provider_name").toLowerCase(Locale.ROOT);
+                                for (String[] s : SERVICES) if (n.contains(s[0])) { on = s[1]; break; }
+                            }
+                            if (!"-".equals(on)) break;
+                        }
+                        break;
+                    }
+                } catch (Exception e) {
+                    AppLog.w("watch providers: " + e.getMessage());
+                    break;
+                }
+                cache.edit().putString(key, on).apply();
+                if (!"-".equals(on)) found++;
+            }
+            if (found > 0) {
+                AppLog.w("watch providers: " + found + " found");
+                post(done);
+            }
+        });
+    }
+
     /** Looks up, once each (TMDB), the original language of the apps' titles Home doesn't know yet; then a new mix. */
     private void fillLangs(List<Pick> titles, Runnable done) {
         if (readKey() == null || titles == null || titles.isEmpty()) return;
@@ -593,23 +661,39 @@ final class Recs {
             int found = 0, asked = 0;
             for (Pick p : titles) {
                 String name = langName(p.title), key = "lang:" + AppContentLogic.normTitle(name);
-                if (asked >= 30 || name.isEmpty() || cache.contains("poster:" + AppContentLogic.normTitle(name))) continue;
+                if (asked >= 30 || name.isEmpty() || cache.contains("bd2:" + AppContentLogic.normTitle(name))) continue;
                 asked++;
                 try {
                     JSONArray r = get("/search/multi?query=" + URLEncoder.encode(name, "UTF-8")).optJSONArray("results");
-                    String lang = "-", poster = "";
+                    String lang = "-", poster = "", bd = "";
+                    // The same name, newest first (an app's new title, not an older one of that name: "Drawn
+                    // Together" 2026, not the 2004 cartoon); no exact name: TMDB's first.
+                    JSONObject pick = null;
+                    String want = AppContentLogic.normTitle(name), pickDate = "";
                     for (int i = 0; r != null && i < r.length(); i++) {
                         JSONObject o = r.getJSONObject(i);
                         String type = o.optString("media_type");
                         if (!type.equals("movie") && !type.equals("tv")) continue;
+                        if (pick == null) pick = o;
+                        String n = AppContentLogic.normTitle(o.optString(type.equals("movie") ? "title" : "name"));
+                        String d = o.optString(type.equals("movie") ? "release_date" : "first_air_date", "");
+                        if (n.equals(want) && (pickDate.isEmpty() || d.compareTo(pickDate) > 0)) { pick = o; pickDate = d.isEmpty() ? "0" : d; }
+                    }
+                    if (pick != null) {   // its TMDB id, kept: watchProviders asks for its services without searching again
+                        cache.edit().putString("tm:" + AppContentLogic.normTitle(name), pick.optString("media_type") + ":" + pick.optInt("id")).apply();
+                    }
+                    for (JSONObject o : pick == null ? new JSONObject[0] : new JSONObject[] {pick}) {
                         lang = o.optString("original_language", "-");
                         poster = o.optString("poster_path", "");
                         if ("null".equals(poster)) poster = "";
+                        bd = o.optString("backdrop_path", "");
+                        if ("null".equals(bd)) bd = "";
                         break;
                     }
                     cache.edit().putString(key, lang.isEmpty() ? "-" : lang)
-                            .putString("poster:" + AppContentLogic.normTitle(name), poster).apply();
-                    if (!poster.isEmpty()) found++;
+                            .putString("poster:" + AppContentLogic.normTitle(name), poster)
+                            .putString("bd2:" + AppContentLogic.normTitle(name), bd).apply();
+                    if (!bd.isEmpty()) found++;
                     if (!"-".equals(lang)) found++;
                 } catch (Exception e) {
                     AppLog.w("title language: " + e.getMessage());
@@ -642,6 +726,32 @@ final class Recs {
         }
         for (NetflixLogic.Title t : NetflixLogic.pick(titles, NetflixLogic.SHOWN, mix, mood == MixLogic.MIX ? null : preferred)) out.add(of.get(t));
         return out;
+    }
+
+    /**
+     * The Top 10 file, only this region's rows (and the global ones) kept: asked with its ETag, so an unchanged week
+     * costs one empty answer (304) and the saved rows are used.
+     */
+    private String netflixTsv() throws IOException {
+        String saved = cache.getString("nf:tsv", null), etag = cache.getString("nf:etag", "");
+        HttpURLConnection c = (HttpURLConnection) new URL(NETFLIX_TOP10).openConnection();
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(15000);
+        if (saved != null && !etag.isEmpty()) c.setRequestProperty("If-None-Match", etag);
+        try {
+            int code = c.getResponseCode();
+            if (code == 304 && saved != null) return saved;
+            if (code != 200) throw new IOException("HTTP " + code);
+            StringBuilder keep = new StringBuilder();
+            for (String line : read(c.getInputStream()).split("\n")) {
+                if (line.contains("\t" + REGION + "\t") || line.contains("\tZZ\t")) keep.append(line).append('\n');
+            }
+            String rows = keep.toString(), tag = c.getHeaderField("ETag");
+            cache.edit().putString("nf:tsv", rows).putString("nf:etag", tag == null ? "" : tag).apply();
+            return rows;
+        } finally {
+            c.disconnect();
+        }
     }
 
     private static String httpText(String url) throws IOException {
@@ -1372,6 +1482,7 @@ final class Recs {
     // Continue Watching from Android TV's Watch Next list (what the apps themselves say you left half-way, with the
     // place you stopped): read in the background, shown first; the cards' own history only when it's empty.
     private volatile List<Pick> watchNext = new ArrayList<>();
+    private volatile boolean wnLooked;
     private volatile List<String> watchLines = new ArrayList<>();
 
     /** Reads Watch Next off the main thread; `done` runs on the main thread when the list changed. */
@@ -1380,7 +1491,8 @@ final class Recs {
             List<Pick> picks = new ArrayList<>();
             List<String> lines = new ArrayList<>();
             // Home Settings > Continue Watching (VYRO: the row is shown only when picked, as its permission is).
-            boolean on = Prefs.topContent().equals(Prefs.TOP_CONTINUE);
+            // VYRO: always read (Home always has the row); only "None" in Home Settings turns it off.
+            boolean on = !Prefs.topContent().equals(Prefs.TOP_NONE);
             for (WatchNext.Item it : on ? WatchNext.load(context) : java.util.Collections.<WatchNext.Item>emptyList()) {
                 if (picks.size() >= ContinueLogic.MAX) break;
                 String art = it.picture();
@@ -1389,20 +1501,39 @@ final class Recs {
                 p.kind = "watchnext";
                 p.id = (it.pkg + "|" + it.title).hashCode();
                 p.title = it.title;
-                p.backdrop = art;
+                // The title's artwork (TMDB's text-free backdrop, looked up once), not the frame where you stopped;
+                // else the app's own picture, Prime's badge off.
+                String bd = cache.getString("bd2:" + AppContentLogic.normTitle(langName(it.title)), "");
+                p.backdrop = !bd.isEmpty() ? CARD_IMAGES + bd : AppContentLogic.cleanArt(art)[0];
                 p.pkg = it.pkg;
                 p.app = serviceOf(it.pkg);
+                // Another app (Stremio, Nuvio…): the icon of the service the title streams on here (watchProviders).
+                if (p.app == null) {
+                    String prov = cache.getString("prov:" + AppContentLogic.normTitle(langName(it.title)), "");
+                    if (!prov.isEmpty() && !"-".equals(prov)) p.app = prov;
+                }
                 p.link = it.intent;
                 p.engaged = it.engaged;
                 p.position = it.position;
+                p.progress = Math.max(0, it.progress());
                 picks.add(p);
                 float pr = it.progress();
                 String where = it.episode != null ? it.episode : it.app != null ? it.app : "";
                 lines.add(pr > 0 ? (where.isEmpty() ? "" : where + " · ") + Ui.trf("{p}% watched", "p", Math.round(pr * 100)) : where);
             }
             boolean changed = picks.size() != watchNext.size();
-            for (int i = 0; !changed && i < picks.size(); i++) changed = !key(picks.get(i)).equals(key(watchNext.get(i))) || !lines.get(i).equals(watchLines.get(i));
+            for (int i = 0; !changed && i < picks.size(); i++) changed = !key(picks.get(i)).equals(key(watchNext.get(i))) || !lines.get(i).equals(watchLines.get(i))
+                    || !String.valueOf(picks.get(i).backdrop).equals(String.valueOf(watchNext.get(i).backdrop))
+                    || !String.valueOf(picks.get(i).app).equals(String.valueOf(watchNext.get(i).app));
+            if (!wnLooked) {   // their artwork: looked up once per start, then the row read again once (no loop)
+                wnLooked = true;
+                fillLangs(picks, () -> refreshWatchNext(done));
+                watchProviders(picks, () -> refreshWatchNext(done));
+            }
             if (!changed) return;
+            Map<String, Integer> per = new LinkedHashMap<>();
+            for (Pick p : picks) per.merge(p.pkg, 1, Integer::sum);
+            AppLog.w("watch next: " + picks.size() + " " + per);
             watchNext = picks;
             watchLines = lines;
             if (done != null) new android.os.Handler(android.os.Looper.getMainLooper()).post(done);
@@ -1415,11 +1546,12 @@ final class Recs {
     }
 
     List<Pick> continueShown(List<String> lines) {
+        // What the apps say you left half-way (Watch Next) first, then the titles last opened from Home's cards.
         List<Pick> wn = watchNext;
-        if (!wn.isEmpty()) {
-            lines.addAll(watchLines);
-            return new ArrayList<>(wn);
-        }
+        List<Pick> first = new ArrayList<>(wn);
+        lines.addAll(watchLines);
+        Set<String> have = new HashSet<>();
+        for (Pick p : wn) have.add(p.title == null ? "" : AppContentLogic.normTitle(p.title));
         List<Pick> history = new ArrayList<>(historyCached());
         java.util.Set<String> hidden = Prefs.watchHidden();
         if (!hidden.isEmpty()) for (java.util.Iterator<Pick> i = history.iterator(); i.hasNext(); ) if (ContinueLogic.stillHidden(hidden, continueHideKey(i.next()), 0, 0)) i.remove();
@@ -1430,10 +1562,11 @@ final class Recs {
         List<Pick> out = new ArrayList<>();
         for (ContinueLogic.Entry e : ContinueLogic.select(entries, now, this::appInstalled)) {
             Pick p = history.get(entries.indexOf(e));
-            out.add(p);
+            if (first.size() >= ContinueLogic.MAX || !have.add(p.title == null ? "" : AppContentLogic.normTitle(p.title))) continue;
+            first.add(p);
             lines.add(ContinueLogic.line(p.kind, p.season, p.openedAt, now, zone));
         }
-        return out;
+        return first;
     }
 
     /** A service's app ("netflix", "prime"…) is on the TV (any of its packages). */

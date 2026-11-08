@@ -44,7 +44,7 @@ final class WatchNext {
 
         Item(String pkg, String poster, String thumbnail) {
             this.pkg = pkg;
-            picture = thumbnail != null ? thumbnail : poster;
+            picture = poster != null ? poster : thumbnail;   // the title's artwork first, not the frame where you stopped
             Uri uri = picture == null ? null : Uri.parse(picture);
             pictureUri = uri != null && ("content".equalsIgnoreCase(uri.getScheme())
                     || "android.resource".equalsIgnoreCase(uri.getScheme())) ? uri : null;

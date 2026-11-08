@@ -20,14 +20,18 @@ public class HomeNavTest {
         check("only continue, from dock", HomeNav.sectionFirst(4, 4, false) == 0);
         // Home without Continue Watching: a mosaic of 9 filling 8 columns × 3 rows exactly (no gap, no overlap), one large.
         int[][] full = HomeNav.BENTO_FULL;
-        check("full bento: 9 tiles", full.length == 9);
-        int[] cells = new int[24];
+        check("full bento: 23 tiles", full.length == 23);
+        int wide = 0;
+        for (int[] b : HomeNav.BENTO) if (b[2] == 2 && b[3] == 1) wide++;
+        check("bento: 13 cards, 2 wide", HomeNav.BENTO.length == 13 && wide == 2);
+        int[] cells = new int[30];
         int big = 0;
         boolean inside = true;
         for (int[] b : full) {
-            if (b[2] >= 3 && b[3] == 2) big++;
+            if (b[2] >= 2 && b[3] == 2) big++;
+            if (b[3] > b[2]) inside = false;   // no tall tiles: squares and wide ones only
             for (int x = b[0]; x < b[0] + b[2]; x++) for (int y = b[1]; y < b[1] + b[3]; y++) {
-                if (x < 0 || x >= 8 || y < 0 || y >= 3) inside = false; else cells[y * 8 + x]++;
+                if (x < 0 || x >= 10 || y < 0 || y >= 3) inside = false; else cells[y * 10 + x]++;
             }
         }
         boolean exact = true;
@@ -35,7 +39,17 @@ public class HomeNavTest {
         check("full bento: inside the grid", inside);
         check("full bento: every cell once", exact);
         check("full bento: one large card", big == 1);
-        check("full bento: the large card first", full[0][2] >= 3 && full[0][3] == 2);
+        check("full bento: the first is large", full[0][2] == 3 && full[0][3] == 2);
+        // The large card follows the focus: card 4 large at column 2; card 0 back to one cell, first; all cells once.
+        int[][] moved = HomeNav.focusBento(6, 2, 9, 4, 2, 0);
+        check("focus: card 4 large there", moved[4][0] == 2 && moved[4][1] == 0 && moved[4][2] == 2 && moved[4][3] == 2);
+        check("focus: card 0 one cell, first", moved[0][0] == 0 && moved[0][1] == 0 && moved[0][2] == 1);
+        int[] mc = new int[12];
+        for (int[] b : moved) for (int x = b[0]; x < b[0] + b[2]; x++) for (int y = b[1]; y < b[1] + b[3]; y++) mc[y * 6 + x]++;
+        boolean once = true;
+        for (int n : mc) once &= n == 1;
+        check("focus: every cell once", once);
+        check("focus: kept inside", HomeNav.focusBento(6, 2, 9, 8, 5, 1)[8][0] == 4 && HomeNav.focusBento(6, 2, 9, 8, 5, 1)[8][1] == 0);
         // Nothing at all.
         check("empty", HomeNav.sectionFirst(0, 0, true) == 0);
 

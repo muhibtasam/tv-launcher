@@ -98,6 +98,37 @@ public final class MixLogic {
         return out;
     }
 
+    /**
+     * At least `min` of `provider`'s titles among the first `within` picks, when it has them: its best ones not picked
+     * (priority, then the seed) take the places of the last other titles there, which move to the end. Else as given.
+     */
+    public static List<Integer> atLeast(List<Integer> picked, List<Item> items, String provider, int min, int within, long seed) {
+        List<Integer> out = new ArrayList<>(picked);
+        int have = 0;
+        for (int i = 0; i < Math.min(within, out.size()); i++) if (items.get(out.get(i)).provider.equals(provider)) have++;
+        if (have >= min) return out;
+        List<Integer> spare = new ArrayList<>();
+        for (int i = within; i < out.size(); i++) if (items.get(out.get(i)).provider.equals(provider)) spare.add(out.get(i));
+        Set<String> keys = new HashSet<>();
+        for (int i : out) keys.add(items.get(i).key);
+        List<Integer> unpicked = new ArrayList<>();
+        for (int i = 0; i < items.size(); i++) if (items.get(i).provider.equals(provider) && !keys.contains(items.get(i).key)) unpicked.add(i);
+        unpicked.sort((a, b) -> {
+            int c = Integer.compare(items.get(a).priority, items.get(b).priority);
+            return c != 0 ? c : Double.compare(unit(seed, items.get(a).key), unit(seed, items.get(b).key));
+        });
+        spare.addAll(unpicked);
+        for (int pos = Math.min(within, out.size()) - 1; pos >= 0 && have < min && !spare.isEmpty(); pos--) {
+            if (items.get(out.get(pos)).provider.equals(provider)) continue;
+            int in = spare.remove(0), gone = out.get(pos);
+            out.remove(Integer.valueOf(in));
+            out.set(out.indexOf(gone), in);
+            out.add(gone);
+            have++;
+        }
+        return out;
+    }
+
     private static int headPriority(List<Integer> list, int from, List<Item> items, Set<String> used) {
         for (int i = from; i < list.size(); i++) if (!used.contains(items.get(list.get(i)).key)) return items.get(list.get(i)).priority;
         return Integer.MAX_VALUE;

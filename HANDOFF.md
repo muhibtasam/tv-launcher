@@ -1,7 +1,7 @@
 # VYRO — handoff
 
 Read this first, then [ARCHITECTURE.md](ARCHITECTURE.md), [FEATURES.md](FEATURES.md) and [CLAUDE.md](CLAUDE.md).
-The history of every step is in [IBTZY_UI_PORT.md](IBTZY_UI_PORT.md). Last updated 2026-11-07.
+The history of every step is in [IBTZY_UI_PORT.md](IBTZY_UI_PORT.md). Last updated 2026-11-08.
 
 ## What VYRO is
 
@@ -17,7 +17,7 @@ apksigner). LG (webOS) and Samsung (Tizen) builds are Free My TV's web app, unch
 | Repo (public) | github.com/muhibtasam/vyro, branch `main` (was `muhibtasam/tv-launcher`, redirects) |
 | Local folder (owner's Mac) | `/Users/mij/Codes/vyro` |
 | Package / app name | `io.vyro.tv` / VYRO |
-| Version | 1.0.8 (versionCode 18) — `app/AndroidManifest.xml` |
+| Version | 1.2.0 (versionCode 21) — `app/AndroidManifest.xml` |
 | Releases | GitHub Releases, tag `vX.Y.Z`, one asset `VYRO.apk` (keyless, `build.sh --generic`) |
 | UI reference (read only) | `/Users/mij/Codes/ibtzy-tv-launcher` (Java, `io.ibtzy.tvlauncher`) and worktrees `/Users/mij/Codes/ibtzy-wt/feature-2.0|2.1|2.2` |
 | Upstream | git remote `upstream` = simbasjungles/free-my-tv; our base was upstream `a9e1027` (2026-10-31), merged to upstream main of 2026-11-07 |

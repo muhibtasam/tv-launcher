@@ -138,6 +138,18 @@ public class MixLogicTest {
         yes("Indian hour: the Hindi titles lead", lang.get(lp.get(0)).key.startsWith("prime:") && lang.get(lp.get(1)).key.startsWith("prime:")
                 && lang.get(lp.get(2)).key.startsWith("prime:"));
 
+        // At least 3 Crunchyroll titles among the first 8, whatever the hour's mix.
+        List<Item> cr = new ArrayList<>();
+        for (int i = 0; i < 12; i++) cr.add(new Item("prime:" + i, "prime", 0));
+        for (int i = 0; i < 6; i++) cr.add(new Item("cr:" + i, "crunchyroll", 4));
+        List<Integer> crPick = MixLogic.atLeast(MixLogic.pick(cr, 15, 3), cr, "crunchyroll", 3, 8, 3);
+        int crIn = 0;
+        for (int i = 0; i < 8; i++) if (cr.get(crPick.get(i)).provider.equals("crunchyroll")) crIn++;
+        yes("crunchyroll: 3 of the first 8", crIn == 3);
+        yes("crunchyroll: nothing lost or doubled", crPick.size() == 15 && new java.util.HashSet<>(crPick).size() == 15);
+        List<Item> noCr = new ArrayList<>(cr.subList(0, 12));
+        yes("no crunchyroll titles: as given", MixLogic.atLeast(MixLogic.pick(noCr, 8, 3), noCr, "crunchyroll", 3, 8, 3).equals(MixLogic.pick(noCr, 8, 3)));
+
         // Publishing: the grid on screen stays until a new list's candidates are resolved; a failed refresh keeps it.
         yes("same list, grid on screen: keep it (redraws, navigation, a failed refresh)", !MixLogic.publish(true, false, true, true, false));
         yes("new list, details still arriving: keep the old grid", !MixLogic.publish(true, true, false, false, true));

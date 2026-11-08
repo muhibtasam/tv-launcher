@@ -80,3 +80,8 @@ check · 1.0.8 personal settings kept.
 - Prime Video's drawn-in badge is cut from its art URL (`AppContentLogic.cleanArt`) and drawn as VYRO's own chip ("New movie", "New series", "Top 10").
 - Each hour has a mood (`MixLogic.mood`): Indian first half the hours, Hollywood a quarter, mixed a quarter; languages from TMDB, cached.
 - Continue Watching: up to 8 16:9 cards under a For You style heading, sliding along (`contScroll`).
+
+## Big Bento, Crunchyroll share, Continue Watching art (1.2.0)
+- Home grid is 10 columns: a 3 × 2 large card that keeps the focus (← → slide the titles through it, `HomeView.slideBento`), 2 wide cards and squares; 13 beside Continue Watching, 23 without (`HomeNav.BENTO`, `BENTO_FULL`, `focusBento`; tests: `HomeNavTest`). Squares show posters, the large and wide cards landscape art.
+- Home draws 20 titles; at least 3 of the first 9 app cards are Crunchyroll's when it has them (`MixLogic.atLeast`; tests: `MixLogicTest`).
+- Continue Watching cards show the title's artwork before the paused frame (`WatchNext`), and are taller.
