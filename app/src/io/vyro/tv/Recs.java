@@ -769,7 +769,11 @@ final class Recs {
     // MARK: - Home's titles from the streaming apps (AppContent)
 
     private ContentObserver appObserver;
-    private final Runnable appChanged = () -> refreshAppContent(this::notifyListeners);
+    private volatile Runnable watchDone;   // what Home runs when Continue Watching changes (its last refreshWatchNext)
+    private final Runnable appChanged = () -> {
+        refreshAppContent(this::notifyListeners);
+        refreshWatchNext(watchDone);   // Continue Watching too: an app's own row, or Watch Next, changed
+    };
 
     /**
      * Reads what the apps publish (off the main thread; Home's return, a change in the apps' lists, a new part of the
@@ -869,6 +873,7 @@ final class Recs {
             android.content.ContentResolver cr = context.getContentResolver();
             cr.registerContentObserver(android.media.tv.TvContract.PreviewPrograms.CONTENT_URI, true, appObserver);
             cr.registerContentObserver(android.media.tv.TvContract.Channels.CONTENT_URI, true, appObserver);
+            cr.registerContentObserver(android.media.tv.TvContract.WatchNextPrograms.CONTENT_URI, true, appObserver);
         } catch (RuntimeException e) {
             AppLog.w("app titles: no change notices (" + e.getMessage() + ")");
         }
@@ -1487,6 +1492,8 @@ final class Recs {
 
     /** Reads Watch Next off the main thread; `done` runs on the main thread when the list changed. */
     void refreshWatchNext(Runnable done) {
+        if (done != null) watchDone = done;
+        observeApps();   // and again whenever an app changes what you're watching, while Home is up
         imagesIo.execute(() -> {
             List<Pick> picks = new ArrayList<>();
             List<String> lines = new ArrayList<>();

@@ -50,6 +50,31 @@ public class HomeNavTest {
         for (int n : mc) once &= n == 1;
         check("focus: every cell once", once);
         check("focus: kept inside", HomeNav.focusBento(6, 2, 9, 8, 5, 1)[8][0] == 4 && HomeNav.focusBento(6, 2, 9, 8, 5, 1)[8][1] == 0);
+        // Home 2.0's hero row: the wide card first, posters after it, gap apart, one height.
+        float[][] row = HomeNav.heroRow(80, 220, 404, 1080, 274, 24, HomeNav.HERO_N);
+        check("hero row: n cards", row.length == HomeNav.HERO_N);
+        check("hero row: wide first", row[0][0] == 80 && row[0][2] == 1160 && row[0][3] == 624);
+        check("hero row: posters after", row[1][0] == 1184 && row[1][2] == 1458 && row[2][0] == 1482);
+        boolean tall = true;
+        for (int i = 1; i < row.length; i++) tall &= row[i][2] - row[i][0] < row[i][3] - row[i][1];
+        check("hero row: posters are tall", tall);
+        check("hero row: the last starts past a 1920 screen", row[row.length - 1][0] > 1920);
+        check("hero row: none", HomeNav.heroRow(0, 0, 10, 10, 5, 1, 0).length == 0);
+        // A wrapped card comes in from the nearest side, not across the row.
+        check("slide: a near move as it was", HomeNav.slideFrom(1184, 80, 1080, 24, 1440) == 1184);
+        check("slide: last to hero comes from the left", HomeNav.slideFrom(2376, 80, 1080, 24, 1440) == 80 - 1080 - 24);
+        check("slide: hero to last comes from the right", HomeNav.slideFrom(80, 2376, 274, 24, 1440) == 2376 + 274 + 24);
+        // The random background: never the same one twice in a row, always in range.
+        check("background: none", HomeNav.nextBackground(0, -1, 0.5) == -1);
+        check("background: only one", HomeNav.nextBackground(1, 0, 0.9) == 0);
+        boolean differs = true, inRange = true;
+        for (int cur = 0; cur < 5; cur++) for (double r = 0; r < 1; r += 0.01) {
+            int n = HomeNav.nextBackground(5, cur, r);
+            differs &= n != cur;
+            inRange &= n >= 0 && n < 5;
+        }
+        check("background: never the same twice", differs);
+        check("background: in range", inRange && HomeNav.nextBackground(5, -1, 0.999) == 4);
         // Nothing at all.
         check("empty", HomeNav.sectionFirst(0, 0, true) == 0);
 

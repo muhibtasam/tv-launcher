@@ -137,6 +137,46 @@ final class Backdrop {
         return new Backdrop(gpu(out), frost, glass, null, null, null, null, null, null);
     }
 
+    /** The size a wallpaper is read at: twice the glass's (GW × GH), all that its blurred versions need. */
+    static final int WALL_W = GW * 2, WALL_H = GH * 2;
+
+    /**
+     * Home 2.0's background from one of your own images: the frosted (background) and glass versions only, lightly
+     * dimmed so the image still shows (Backdrop.make's day and night treatments, built for titles' art, nearly hid
+     * it), and no card images. `src` (about WALL_W wide) is recycled. About 1.2 MB in all.
+     */
+    static Backdrop wallpaper(Bitmap src) {
+        Bitmap out = Bitmap.createBitmap(WALL_W, WALL_H, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(out);
+        float scale = Math.max((float) WALL_W / src.getWidth(), (float) WALL_H / src.getHeight());
+        float sw = src.getWidth() * scale, sh = src.getHeight() * scale;
+        c.drawBitmap(src, null, new RectF((WALL_W - sw) / 2, (WALL_H - sh) / 2, (WALL_W + sw) / 2, (WALL_H + sh) / 2),
+                new Paint(Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG));
+        src.recycle();
+        int[] frost = reduce(out, FW, FH, 3, 3);
+        // The glass reads a lightly blurred copy (GW × GH): the image's shapes show through it and bend at its rim, so
+        // it reads as clear glass over the heavily frosted background (the same blur both sides looked like a tint).
+        int[] glass = black(reduce(out, GW, GH, 2, 1), WALL_DIM);
+        out.recycle();
+        // One fixed black overlay (WALL_DIM), the same by day and by night: the image always looks the same.
+        int[] dimmed = black(frost.clone(), WALL_DIM);
+        return new Backdrop(null, frost, null, null, null, dimmed, glass, dimmed, glass);
+    }
+
+    /** How much black lies over your background images (0 to 1), so the cards and text in front of them read. */
+    static final float WALL_DIM = 0.62f;
+
+    /** A plain black overlay: each channel times 1 - amount (no tint, unlike darken). */
+    private static int[] black(int[] px, float amount) {
+        float keep = 1 - amount;
+        for (int i = 0; i < px.length; i++) {
+            int p = px[i];
+            px[i] = 0xFF000000 | (Math.round(((p >> 16) & 255) * keep) << 16) | (Math.round(((p >> 8) & 255) * keep) << 8)
+                    | Math.round((p & 255) * keep);
+        }
+        return px;
+    }
+
     /** How many times smaller the screensaver photo's frosted version is (the glass math uses the same number). */
     static final int PHOTO_FROST = 6;
 

@@ -76,6 +76,9 @@ final class HomeApps {
         Bitmap tile;        // 16:9 card (apps and specials)
         Bitmap icon;        // square app icon for the dock (apps without a brand logo)
         Bitmap iconDark;    // the same icon in iOS's dark style (dark tile, the brand color on the mark)
+        Bitmap banner;      // Home 2.0's dock: the app's own TV banner (16:9), else its icon on a dark card
+        int glow;           // the banner's average color: the focused tile's soft glow (0: none)
+        int tileColor;      // the dark icon's background color: the dock tile, so the icon blends into it
         Bitmap logo;        // colored logo with no background (shelf); null = use the card
         Bitmap logoDark;    // version for a light background (YouTube's white icon), if any
         float logoInk;      // fraction of the logo with ink (thin logos are drawn larger, with the same "weight")
@@ -187,6 +190,11 @@ final class HomeApps {
                 if (it.logo != null) it.logoInk = ink(it.logo);
                 it.logoDark = ownLogoCached(c, d[0] + "-dark");
             }
+            if (it.pkg != null) {   // Home 2.0's dock shows banners, glowing in their own color when focused
+                it.banner = appTile(c, null, it.pkg, 0);
+                it.glow = glowOf(it.banner);
+                it.tileColor = tileColorOf(it.iconDark != null ? it.iconDark : it.icon);   // dark style first
+            }
             items.add(it);
         }
         if (!shelfTimed) {   // the first build in this process (the startup one): where its time went
@@ -273,6 +281,10 @@ final class HomeApps {
                 if (it.icon == null) return null;   // incomplete: no saved dock rather than a broken one
                 it.icon.setHasMipMap(true);
                 if (it.iconDark != null) it.iconDark.setHasMipMap(true);
+                // The banner as saved: reading it from the app at start-up took 309 ms on the main thread (10 apps).
+                it.banner = BitmapFactory.decodeFile(new File(dir, i + "-banner.png").getPath());
+                it.glow = o.optInt("glow");
+                it.tileColor = tileColorOf(it.iconDark != null ? it.iconDark : it.icon);   // dark style first
                 out.add(it);
             }
             return out;
@@ -299,11 +311,11 @@ final class HomeApps {
                     updated = pm.getPackageInfo(it.pkg, 0).lastUpdateTime;
                 } catch (PackageManager.NameNotFoundException ignored) {
                 }
-                a.put(new org.json.JSONObject().put("pkg", it.pkg).put("key", it.key).put("label", it.label));
+                a.put(new org.json.JSONObject().put("pkg", it.pkg).put("key", it.key).put("label", it.label).put("glow", it.glow));
                 sig.append(SAVED_ICON).append(':').append(it.pkg).append('|').append(it.key).append('|').append(it.label).append('|').append(updated).append(';');
             }
             File dir = dockDir(c), index = new File(dir, "index.json");
-            String signature = sig.toString();
+            String signature = "banners;" + sig;   // saved with their banners (Home 2.0): an older save is written again
             if (index.exists()) {
                 try (java.io.FileInputStream in = new java.io.FileInputStream(index)) {
                     byte[] bytes = new byte[(int) index.length()];
@@ -320,6 +332,9 @@ final class HomeApps {
                 File dark = new File(dir, i + "-dark.png");
                 if (it.iconDark != null) writePng(it.iconDark, dark);
                 else dark.delete();
+                File banner = new File(dir, i + "-banner.png");
+                if (it.banner != null) writePng(it.banner, banner);
+                else banner.delete();
             }
             File tmp = new File(dir, "index.json.tmp");
             try (FileOutputStream out = new FileOutputStream(tmp)) {
@@ -838,6 +853,28 @@ final class HomeApps {
      * Square dock icon, like a macOS one: an adaptive icon's layers in a rounded square; an old-style icon that fills
      * its square as it is, clipped to the same shape; a free-form one centered on a light tile.
      */
+    /**
+     * The brand color behind an app's mark: the round icon's background, read 16% in along a diagonal (inside the
+     * circle, clear of the mark), so the icon blends into a tile of that color (Crunchyroll orange, Prime Video blue).
+     */
+    static int tileColorOf(Bitmap icon) {
+        if (icon == null) return 0;
+        int e = Math.round(icon.getWidth() * 0.16f);
+        return 0xFF000000 | icon.getPixel(e, e);
+    }
+
+    /** A banner's average color (one filtered pixel), lifted so a dark banner still glows a little; 0 for none. */
+    static int glowOf(Bitmap b) {
+        if (b == null) return 0;
+        Bitmap one = Bitmap.createScaledBitmap(b, 1, 1, true);
+        int p = one.getPixel(0, 0);
+        if (one != b) one.recycle();
+        float[] hsv = new float[3];
+        android.graphics.Color.colorToHSV(p, hsv);
+        hsv[2] = Math.max(hsv[2], 0.55f);
+        return android.graphics.Color.HSVToColor(hsv);
+    }
+
     static synchronized Bitmap dockIcon(Context c, String pkg) {
         if (ICONS.containsKey(pkg)) return ICONS.get(pkg);
         Drawable icon = null;

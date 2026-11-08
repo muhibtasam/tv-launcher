@@ -299,6 +299,27 @@ final class Prefs {
     static boolean saverWatch() { return sp().getBoolean("saverWatch", false); }
     static void setSaverWatch(boolean on) { put("saverWatch", on); }
 
+    // MARK: - Backgrounds (Home Settings > Backgrounds)
+
+    /** Home's background: your photos (Backgrounds; the titles' artwork while there are none), the titles' artwork, or none. */
+    static final String BG_OWN = "own", BG_TITLES = "titles", BG_OFF = "off";
+    static final String[] BG_SOURCES = {BG_OWN, BG_TITLES, BG_OFF};
+    /** How often Home's background changes, in minutes (the choices; 4 by default). */
+    static final int[] BG_MINUTES = {1, 4, 10, 30};
+    static String bgSource() { return sp().getString("bgSource", BG_OWN); }
+    static void setBgSource(String source) { put("bgSource", source); }
+    static int bgMinutes() { return sp().getInt("bgMinutes", 4); }
+    static void setBgMinutes(int minutes) { put("bgMinutes", minutes); }
+    /** Your backgrounds in the screensaver too (with My Photos, or instead of the picks). */
+    static boolean bgSaver() { return sp().getBoolean("bgSaver", false); }
+    static void setBgSaver(boolean on) { put("bgSaver", on); }
+    /** The drive photos already copied (size:name), so a removed one isn't copied back from the same drive. */
+    static Set<String> bgCopied() { return new HashSet<>(sp().getStringSet("bgCopied", new HashSet<>())); }
+    static void setBgCopied(Set<String> keys) {
+        sp().edit().putStringSet("bgCopied", new HashSet<>(keys)).apply();
+        version++;
+    }
+
     // MARK: - Top of the home screen
 
     static final String TOP_PICKS = "picks", TOP_CONTINUE = "continue", TOP_NONE = "none";

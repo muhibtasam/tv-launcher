@@ -86,12 +86,16 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     // spreads (and the glass widens) so nothing overlaps.
     // Compact, in a macOS Dock's proportions (measured: padding 29% of an icon, gaps 33%): 80 px icons, 23 px of glass
     // around them, 26 px apart, floating 44 px above the screen's bottom edge (inside a TV's safe area).
-    private static final float SHELF_PAD = 12, TILE_GAP = 16, DOCK_ICON = 56, DOCK_BOTTOM = 1036;
+    // Home 2.0's shelf: 124 × 70 tiles (16:9), 16 apart, 12 padding: 94 tall from 964 to 1058, 38 under Continue
+    // Watching (room for the focused app's name above its tile) and 22 above the screen's edge.
+    private static final float SHELF_PAD = 12, TILE_GAP = 16, DOCK_BANNER_W = 124, DOCK_BANNER_H = 70, DOCK_BOTTOM = 1058;
+    private static final float DOCK_RADIUS = 12, DOCK_GLASS_RADIUS = 26;
     // iOS 27's icon corner, measured on an iPhone: a radius of 24.5% of the side (19.6 of 80).
     private static final float TILE_RADIUS = 19.6f;
-    private static final float DOCK_NEAR = 0.55f, DOCK_FAR = 0.15f, DOCK_POP = 10;
+    private static final float DOCK_NEAR = 0, DOCK_FAR = 0, DOCK_POP = 3;   // only the focused tile grows, lifted 6 (its name sits above it)
+    private static final float BANNER_ZOOM = 0.035f;   // the focused banner's art, inside its frame (Halo TV)
     // Tile focus (Apple TV style): it grows from the center and its shadow drops (it "rises" toward the viewer).
-    private static final float FOCUS_GROW = 0.5f;
+    private static final float FOCUS_GROW = 0.10f;   // 124 × 70 → 136 × 77 (Halo TV's 1.10)
     // Corner capsule.
     // Corner capsule: the height and top offset of the tvOS tab bar (68 and 46).
     private static final float CAPSULE_TOP = 46, CAPSULE_H = 68, BUTTON = 56;
@@ -236,6 +240,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     // to the grid (220), the grid (404 tall) to Continue Watching's heading, its heading to its cards (CONT_HEAD), and
     // the cards (bottom 926) to the dock's glass (956).
     private static final float V1_GAP = 24, V1_BENTO_TOP = 220, V1_BENTO_H = 404, V1_CONT_TOP = 644, V1_CONT_H = 282;
+    // Home 2.0's hero row (HomeNav.heroRow): the focused title 1.88:1, posters 0.68:1, both V1_BENTO_H tall.
+    private static final float V2_HERO_W = 760, V2_POSTER_W = 274;
     private static final float V1_CONT_COL = 296, V1_CONT_COL_GAP = 32;
     private float contHeadBase;   // Continue Watching's top (layoutBento)
     /** How many of the cards are the Continue row's (Home only; 0: the bento has the whole area). */
@@ -1284,8 +1290,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
      * white). One value: IVORY_TEXT below is made from it. Plain text, artwork and glass highlights stay as they are.
      */
     private static final int ACCENT = 0xFFFFFFE0;
-    /** #FFFFE0: white text multiplied by it becomes ivory; black stays black. */
-    static final android.graphics.ColorFilter IVORY_TEXT = new android.graphics.LightingColorFilter(ACCENT & 0xFFFFFF, 0);
+    /** Home 2.0: text stays pure white (was ACCENT's ivory: white text multiplied by #FFFFE0); black stays black. */
+    static final android.graphics.ColorFilter IVORY_TEXT = new android.graphics.LightingColorFilter(0xFFFFFF, 0);
 
     /** The accent at an opacity (for icons that were white at that opacity). */
     private static int accent(float alpha) {
@@ -1687,12 +1693,13 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
 
     /** After new picks or rows: the artwork if the remote is on titles, else the mood. */
     private void refreshBackground() {
+        if (ownBgShown()) return;   // Home 2.0: your own image, over the moods
         if (onTitles()) showTitleArt(); else syncMood();
     }
 
     /** Shows this tab's mood with the key light where the remote is; nothing when it's already on screen. */
     private void syncMood() {
-        if (!moodsOn()) return;
+        if (!moodsOn() || ownBgShown()) return;
         if (onTitles()) {   // just arrived on the titles: the focused one's artwork, at once; then it follows (FOLLOW_MS)
             if (moodShown != TITLES) {
                 moodShown = TITLES;
@@ -2048,7 +2055,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         float full = (CONTENT_R - MARGIN) * k;
         // Icons always at their size (they used to shrink to fit, then the dock was cut at 10 apps): the glass is as
         // wide as the row, at most the content width less room for the magnified icons; past that, the row scrolls.
-        float tw = DOCK_ICON * k, th = tw;
+        float tw = DOCK_BANNER_W * k, th = DOCK_BANNER_H * k;
         float width = n * tw + Math.max(0, n - 1) * gap;
         // The glass shows a whole number of icons (it used to be "whatever width fits", so its edge cut an icon in
         // half): as many as fit with room left for the magnified ones; more apps scroll.
@@ -2058,7 +2065,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         float visible = n <= fit ? width : fit * dockStep - gap;
         float left = (w - visible) / 2f;
         float bottom = DOCK_BOTTOM * k, top = bottom - th - 2 * pad;
-        platterRect.set(left - 2 * pad, top, left + visible + 2 * pad, bottom);   // 24 at the ends, 12 above and below
+        platterRect.set(left - pad, top, left + visible + pad, bottom);   // 12 all round
         dockVisibleL = left;
         dockVisibleR = left + visible;
         dockMaxScroll = n <= fit ? 0 : (n - fit) * dockStep;   // whole icons: it can rest at any of them
@@ -2157,11 +2164,22 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         if (shelf.isEmpty()) return;
         computeDock();
         drawnSpread = dockSpread;
-        float radius = platterRect.height() / 2;   // a full pill, as the tabs
+        float radius = DOCK_GLASS_RADIUS * k;
         glassRect.set(platterRect.left - dockSpread / 2, platterRect.top, platterRect.right + dockSpread / 2, platterRect.bottom);
-        // Home Design V1: the same glass as the Inputs bar (a very light translucent fill, a faint hairline and a touch
-        // of light along the top edge); no refraction, no shadow.
-        drawFlatGlass(c, glassRect, radius);
+        // Home 2.0: liquid glass (Shaders.LIQUID: the blurred background bent at the rim, a lit edge) over a soft
+        // shadow. This layer is cached, so the shader runs only when the dock or the background changes. Android 8 to
+        // 12 and low-RAM TVs (Ui.LEGACY): Home Design V1's flat glass, as before.
+        if (Ui.LEGACY) {
+            drawFlatGlass(c, glassRect, radius);
+            return;
+        }
+        tmp.set(glassRect);
+        tmp.offset(0, 12 * k);
+        shadowDeep.setColor(0x47000000);
+        shadows.drawCached(c, tmp, radius, DEEP_BLUR * k, shadowDeep);
+        // Clear glass: no fill (a touch of lift for the darks), a thick curved rim that bends the image behind it
+        // (a lens), a lit top-left edge; the dark tiles sit on it.
+        scene.liquid(c, glassRect, radius, 0xFFFFFFFF, 0.04f, 0.03f, 26 * k, 22 * k, 0.9f, 1);
     }
 
     private LinearGradient glassTopLight;
@@ -2312,7 +2330,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             }
         }
         if (scrolls) c.restore();
-        if (top >= 0 && liftIndex < 0) drawDockLabel(c, top);   // macOS: the name over the magnified icon, no ring
+        if (top >= 0 && liftIndex < 0) drawDockLabel(c, top);   // the focused app's name
     }
 
     /** The focused app's name in a small pill above its popped icon, as macOS shows it over the Dock. */
@@ -2322,6 +2340,18 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         String name = shelf.get(i).label;
         if (name == null || name.isEmpty()) return;
         RectF base = tileRects[i];
+        if (shelf.get(i).banner != null) {
+            // Home 2.0's tiles: the name just above the lifted tile, as text with a soft shadow (no pill): it fits in the
+            // gap under Continue Watching's cards (a pill reached up over their titles), fading in with the focus.
+            float tileTop = base.bottom - base.height() * dockS[i] - DOCK_POP * k * tileFocus[i].value;
+            int old = dockLabel.getColor();
+            dockLabel.setColor(Ui.alpha(0xFFF5F5F7, fc));
+            dockLabel.setShadowLayer(6 * k, 0, 1 * k, Ui.alpha(0xFF000000, 0.85f * fc));
+            c.drawText(name, dockCx[i], tileTop - 15 * k, dockLabel);
+            dockLabel.clearShadowLayer();
+            dockLabel.setColor(old);
+            return;
+        }
         float iconTop = base.bottom - base.height() * dockS[i] - DOCK_POP * k * tileFocus[i].value;
         dockLabel.setColor(Ui.alpha(tone(0xFF1D1D1F, 0xFFF5F5F7), fc));
         float tw = dockLabel.measureText(name), ph = 38 * k, pw = tw + 30 * k;
@@ -2351,6 +2381,52 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         float cy = base.bottom - bh * s / 2 - DOCK_POP * k * Math.max(0, f);
         cell.set(cx - bw * s / 2, cy - bh * s / 2, cx + bw * s / 2, cy + bh * s / 2);
         float r = r0 * s;
+        if (it.banner != null) {   // Home 2.0: the app's dark-style logo on a dark tile (the banner without an icon)
+            float br = DOCK_RADIUS * k * s;
+            if (fc > 0.01f && it.glow != 0) {   // focused: the banner's own color glowing softly behind it
+                tmp.set(cell);
+                tmp.inset(-8 * k, -6 * k);
+                shadowDeep.setColor(Ui.alpha(it.glow, 0.6f * fc));
+                shadows.draw(c, tmp, br + 8 * k, 26 * k, shadowDeep);
+            }
+            tmp.set(cell);
+            tmp.offset(0, (4 + 10 * f) * k);
+            shadowDeep.setColor(Ui.alpha(0xFF000000, 0.3f + 0.2f * fc));
+            shadows.draw(c, tmp, br, DEEP_BLUR * k, shadowDeep);
+            // Dark mode: the dark-style icon (brand-colored mark on a dark tile) on a tile of its own color, edge to
+            // edge; no glass frame or border at rest, only the white ring when focused.
+            Bitmap logo = it.iconDark != null ? it.iconDark : it.icon;
+            if (logo != null) {
+                tileFill.setShader(null);
+                tileFill.setColor(it.tileColor != 0 ? it.tileColor : 0xFF16161A);
+                c.drawRoundRect(cell, br, br, tileFill);
+                float d = cell.height() * 0.74f * (1 + BANNER_ZOOM * fc);   // the icon zooms a little on focus: depth
+                int size = Math.round(cell.height() * 0.74f * (1 + BANNER_ZOOM));
+                Bitmap ready = crispIcon(logo, size, size / 2f);
+                glassTmp.set(cell.centerX() - d / 2, cell.centerY() - d / 2, cell.centerX() + d / 2, cell.centerY() + d / 2);
+                if (ready != null) c.drawBitmap(ready, null, glassTmp, bitmapPaint);
+                else roundImage(c, logo, glassTmp, d / 2);
+            } else {   // no icon: the banner, filling the tile
+                glassTmp.set(cell);
+                c.save();
+                clip.reset();
+                clip.addRoundRect(glassTmp, br, br, Path.Direction.CW);
+                c.clipPath(clip);
+                float z = 1 + BANNER_ZOOM * fc;
+                c.scale(z, z, glassTmp.centerX(), glassTmp.centerY());
+                c.drawBitmap(it.banner, null, glassTmp, bitmapPaint);
+                c.restore();
+            }
+            if (fc > 0.01f) {
+                tmp.set(cell);
+                tmp.inset(-4 * k, -4 * k);
+                border.setColor(Ui.alpha(0xE6FFFFFF, fc));
+                border.setStrokeWidth(2.5f * k);
+                c.drawRoundRect(tmp, br + 4 * k, br + 4 * k, border);
+                border.setStrokeWidth(2 * k);
+            }
+            return;
+        }
         // Shadow at the resting icon size, enlarged by the transform (so the blur stays cached): short at rest, deep
         // and lower when focused.
         c.save();
@@ -8244,6 +8320,16 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
         float height = bottom - top;
         count -= cont;
+        if (tab == 0) {   // Home 2.0: the hero row (Netflix style), the focused title wide and posters after it
+            float[][] row = HomeNav.heroRow(left, top, V1_BENTO_H * k, V2_HERO_W * k, V2_POSTER_W * k, g, HomeNav.HERO_N);
+            bentoN = row.length;
+            int n = count <= 0 ? row.length : Math.min(row.length, count);
+            for (int j = 0; j < n && cont + j < cardRects.length; j++) {
+                cardRects[cont + j].set(row[j][0], row[j][1], row[j][2], row[j][3]);
+                bentoBig[cont + j] = j == 0;
+            }
+            return;
+        }
         // No Continue row: 11 tiles in 3 rows over the whole area (10 when only 10 picks came); with it, 10 in 2 rows.
         int[][] lay = cont == 0 && (count <= 0 || count >= HomeNav.BENTO_FULL.length) ? HomeNav.BENTO_FULL : BENTO;
         int layRows = lay == HomeNav.BENTO_FULL ? 3 : 2;
@@ -8276,11 +8362,12 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
 
     // Continue Watching's row: 16:9 cards from the heading column on, sliding like For You's rows (contScroll, in px).
     private final Spring contScroll = new Spring(0.26f, 1f, 0);
-    private static final float CONT_HEAD = 68, CONT_CARD_H = 214;   // heading baseline (top + 38) + 30; cards end at 926   // For You's heading-to-cards space; small 16:9 cards
+    // Home 2.0: five cards across the content width (333 wide), 214 tall; the heading baseline (top + 38) + 30, cards end at 926.
+    private static final float CONT_HEAD = 68, CONT_CARD_H = 214, CONT_CARD_W = 333;
     private float contX0;
 
     private void layoutContRow(int cont) {
-        float g = V1_GAP * k, ct = (V1_CONT_TOP + CONT_HEAD) * k, ch = CONT_CARD_H * k, cw = ch * 16f / 9f;
+        float g = V1_GAP * k, ct = (V1_CONT_TOP + CONT_HEAD) * k, ch = CONT_CARD_H * k, cw = CONT_CARD_W * k;
         contX0 = MARGIN * k;
         for (int i = 0; i < cont && i < cardRects.length; i++) {
             float x = contX0 + i * (cw + g) - contScroll.value;
@@ -8293,7 +8380,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private void aimContScroll(boolean snap) {
         float target = 0;
         if (tab == 0 && bento() && contShown > 0 && zone == Z_CARDS && cardIndex < contShown) {
-            float g = V1_GAP * k, cw = CONT_CARD_H * k * 16f / 9f, right = CONTENT_R * k;
+            float g = V1_GAP * k, cw = CONT_CARD_W * k, right = CONTENT_R * k;
             float max = Math.max(0, contX0 + contShown * (cw + g) - g - right);
             float left = contX0 + cardIndex * (cw + g);
             target = contScroll.target;
@@ -8315,7 +8402,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
      * back to one cell; off the grid (tabs, dock) the first is large again. The cards move there (bentoMorph).
      */
     private void aimBigCard(boolean snap) {
-        if (tab != 0 || !bento() || cards.size() <= contShown) return;
+        if (tab == 0) return;   // Home 2.0: the hero row keeps its wide card first; the titles slide through it
+        if (!bento() || cards.size() <= contShown) return;
         int want = zone == Z_CARDS && cardIndex >= contShown ? cardIndex - contShown : 0;   // elsewhere: the first
         if (want == bigCard) return;
         int n = cards.size();
@@ -8342,11 +8430,32 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         heroDirty = true;
     }
 
+    // A held ← or →: one title every SLIDE_HELD_MS, a steady glide (the remote repeats ~20 times a second; restarting
+    // the slide on each repeat made the row stutter and redid the cards' list 20 times a second).
+    private static final long SLIDE_HELD_MS = 170;
+    private long lastSlideAt;
+    // The hero a → slide replaced: drawn leaving to the left while the next title grows into its place.
+    private Recs.Pick ghostPick;
+    private final RectF ghostFrom = new RectF(), ghostAt = new RectF();
+    private final Rect ghostSrc = new Rect();
+
     /**
-     * ← → on Home's grid: the next (or previous) title slides into the large, focused card, the others move along a
-     * place (bentoMorph), the one it replaces goes to the end of the list; a new one slides in at the last place.
+     * ← → on Home's hero row: the next (or previous) title slides into the hero, the others move along a place
+     * (bentoMorph), the one it replaces goes to the end of the list; a new one slides in at the last place.
      */
     private void slideBento(int dx) {
+        long now = SystemClock.uptimeMillis();
+        if (now - lastSlideAt < SLIDE_HELD_MS) return;   // held: wait for the next beat of the glide
+        lastSlideAt = now;
+        ghostPick = null;
+        if (dx > 0 && contShown < cards.size()) {   // the outgoing hero, at its size and art as shown now
+            ghostPick = cards.get(contShown);
+            ghostFrom.set(shownRect(contShown));
+            Backdrop gb = recs.backdrop(ghostPick);
+            Bitmap gi = gb == null ? null : gb.frame != null ? gb.frame : gb.wide;
+            if (gi == null) ghostPick = null;
+            else coverSrc(gi, ghostFrom.width() / Math.max(1, ghostFrom.height()), ghostSrc);
+        }
         Map<String, RectF> was = new HashMap<>();
         for (int i = contShown; i < cards.size() && i < cardRects.length; i++) was.put(Recs.key(cards.get(i)), new RectF(shownRect(i)));
         bentoShift += dx;
@@ -8364,8 +8473,14 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
         for (int i = contShown; i < n && i < cardRects.length; i++) {
             RectF from = was.get(Recs.key(cards.get(i)));
-            if (from != null) morphFrom[i].set(from);
-            else {
+            if (from != null) {
+                morphFrom[i].set(from);
+                // Wrapped around the list (the old hero to the end, the last to the hero): in from the nearest side,
+                // at its new size, instead of flying across the row.
+                RectF to = cardRects[i];
+                float start = HomeNav.slideFrom(from.left, to.left, to.width(), V1_GAP * k, w * 0.75f);   // a step moves ≤ the hero's width; a wrap, the whole row
+                if (start != from.left) morphFrom[i].set(start, to.top, start + to.width(), to.bottom);
+            } else {
                 morphFrom[i].set(cardRects[i]);
                 morphFrom[i].offset(dx * (cardRects[i].width() + V1_GAP * k), 0);
             }
@@ -8380,10 +8495,19 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     }
 
     /** Each title the grid slides through, its art at both sizes asked for once now: a slide then finds it ready. */
+    private String prefetchedFor = "";
+
     private void prefetchSlideArt() {
         if (bentoPool.isEmpty() || cardRects.length <= contShown + 1) return;
         RectF big = cardRects[contShown], small = cardRects[contShown + 1];
         if (big.width() <= 0 || small.width() <= 0) return;
+        // Once per set of titles and sizes: updateCards runs every 15 s (the tick), and asking again each time reloaded
+        // whatever the cache had let go, redrawing Home for seconds with nothing on screen changing.
+        StringBuilder sig = new StringBuilder().append(Math.round(big.width())).append('x').append(Math.round(small.width()));
+        for (Recs.Pick p : bentoPool) sig.append('|').append(Recs.key(p));
+        String now = sig.toString();
+        if (now.equals(prefetchedFor)) return;
+        prefetchedFor = now;
         for (Recs.Pick p : bentoPool) {
             squareArt(p, small.width(), small.height());   // the poster (narrow cards), downloaded once to the disk cache
             squareArt(p, big.width(), big.height());
@@ -8406,20 +8530,47 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         if (wasNarrow == isNarrow) return;
         Bitmap old = wasNarrow ? squareArt(p, from.width(), from.height()) : b == null ? null : b.frame != null ? b.frame : b.wide;
         if (old == null) return;
-        float iw = old.getWidth(), ih = old.getHeight(), want = to.width() / to.height();
-        if (iw / ih > want) {
-            float sw = ih * want;
-            fadeSrc.set(Math.round((iw - sw) / 2), 0, Math.round((iw + sw) / 2), Math.round(ih));
-        } else {
-            float sh = iw / want;
-            fadeSrc.set(0, Math.round((ih - sh) * 0.4f), Math.round(iw), Math.round((ih - sh) * 0.4f + sh));
-        }
+        coverSrc(old, to.width() / to.height(), fadeSrc);
         fadePaint.setAlpha(Math.round(255 * (1 - Ui.clamp(bentoMorph.value))));
         c.save();
         clip.reset();
         clip.addRoundRect(to, cardRadius(i), cardRadius(i), Path.Direction.CW);
         c.clipPath(clip);
         c.drawBitmap(old, fadeSrc, to, fadePaint);
+        c.restore();
+    }
+
+    /** The part of `img` that fills a `want`-shaped box, like object-fit: cover (centered across, 40% down). */
+    private static void coverSrc(Bitmap img, float want, Rect out) {
+        float iw = img.getWidth(), ih = img.getHeight();
+        if (iw / ih > want) {
+            float sw = ih * want;
+            out.set(Math.round((iw - sw) / 2), 0, Math.round((iw + sw) / 2), Math.round(ih));
+        } else {
+            float sh = iw / want;
+            out.set(0, Math.round((ih - sh) * 0.4f), Math.round(iw), Math.round((ih - sh) * 0.4f + sh));
+        }
+    }
+
+    /**
+     * The hero a → slide replaced, sliding out to the left by its own width and fading as the slide runs
+     * (bentoMorph): one bitmap draw from the picture in memory, no layer.
+     */
+    private void drawHeroGhost(Canvas c) {
+        float v = bentoMorph.value;
+        if (ghostPick == null || v >= 1) return;
+        Backdrop b = recs.backdrop(ghostPick);
+        Bitmap img = b == null ? null : b.frame != null ? b.frame : b.wide;
+        if (img == null) return;
+        ghostAt.set(ghostFrom);
+        ghostAt.offset(-(ghostFrom.width() + V1_GAP * k) * Ui.clamp(v), 0);
+        fadePaint.setAlpha(Math.round(255 * (1 - Ui.clamp(v))));
+        float r = cardRadius(contShown);
+        c.save();
+        clip.reset();
+        clip.addRoundRect(ghostAt, r, r, Path.Direction.CW);
+        c.clipPath(clip);
+        c.drawBitmap(img, ghostSrc, ghostAt, fadePaint);
         c.restore();
     }
 
@@ -8491,7 +8642,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             }
             bentoPool = new ArrayList<>(rest);   // every title the grid slides through: kept in memory, loaded once
             if (!rest.isEmpty() && bentoShift != 0) java.util.Collections.rotate(rest, -Math.floorMod(bentoShift, rest.size()));   // slid along
-            for (Recs.Pick p : rest) if (all.size() < cont.size() + (cont.isEmpty() ? HomeNav.BENTO_FULL.length : BENTO.length)) all.add(p);
+            for (Recs.Pick p : rest) if (all.size() < cont.size() + HomeNav.HERO_N) all.add(p);   // the hero row's cards
             list = all;
         }
         int contBefore = contShown;
@@ -8533,13 +8684,20 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             heroDirty = true;
             return;
         }
+        if (tab == 0) {   // Home 2.0: your images when there are any (they take the moods' place)
+            ownBgOn = Backgrounds.on(getContext());
+            if (ownBgOn) {
+                Backdrop own = homeBackground();
+                if (own != null) ownBg = own;
+            }
+        }
         if (moodsOn()) {
             refreshBackground();
             return;
         }
         int shown = bento() && zone == Z_CARDS ? Math.min(cardIndex, cards.size() - 1) : 0;
-        Backdrop b = cards.isEmpty() ? null : recs.backdrop(cards.get(Math.max(0, shown)));
-        if (cards.isEmpty() || b != null) showBackdrop(b);
+        Backdrop b = cards.isEmpty() ? null : tab == 0 ? homeBackground() : recs.backdrop(cards.get(Math.max(0, shown)));
+        if (cards.isEmpty() || b != null || (tab == 0 && Prefs.BG_OFF.equals(Prefs.bgSource()))) showBackdrop(b);
         heroDirty = true;
         spoken.focusMoved();    // new picks under the focused card
     }
@@ -8642,7 +8800,6 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private final Spring[] tabOpen = new Spring[TABS];   // the capsule with its name: only while the remote is on the tabs
     private final float[] tabCap = new float[TABS];
     private Paint tabName;
-    private LinearGradient tabGraphite, tabIvory, tabInner;
     private final Matrix tabM = new Matrix();
 
     private Spring tabSel(int i) {
@@ -8687,6 +8844,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             x += wv + 16 * k;
         }
     }
+
+    private LinearGradient tabGraphite, tabIvory, tabInner;
 
     private void shaderIn(LinearGradient g, RectF r) {
         tabM.setScale(r.width(), r.height());
@@ -8806,6 +8965,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                 if (recs.listLoading()) for (int j = contShown; j < Math.min(SLOTS, contShown + bentoN); j++) drawSkeletonSlot(c, cardRects[j], bentoBig[j], 1);
                 else drawBentoEmpty(c);
             }
+            drawHeroGhost(c);   // the hero a slide replaced, leaving to the left (under the cards)
             for (int i = 0; i < count; i++) if (i != top) drawBentoCardInRow(c, i);
             if (top >= 0) drawBentoCardInRow(c, top);
             if (contMenu >= 0) drawContMenu(c);
@@ -9066,9 +9226,77 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         handler.postDelayed(followRested, FOLLOW_MS);
     }
 
+    // Home 2.0: the background is one of your own images (Backgrounds: the TV's Backgrounds folder) at random, else a
+    // random title's artwork (already loaded for the hero row); blurred as before, changed every homeBgMs() while Home
+    // shows; it no longer follows the focus.
+    /** How often it changes: Home Settings > Backgrounds (4 minutes by default). */
+    private static long homeBgMs() {
+        return Prefs.bgMinutes() * 60_000L;
+    }
+    private final java.util.Random bgRandom = new java.util.Random();
+    private Recs.Pick homeBgPick;
+    private long homeBgAt, homeBgDue;   // homeBgDue: when the timer turns your image next (0: no timer)
+    // Your images on Home (Backgrounds): ownBgOn is read in updateCards (not every frame: it stats two folders);
+    // ownBg is the one built last. While on, Home shows it instead of the moods (other tabs keep theirs).
+    private boolean ownBgOn;
+    private Backdrop ownBg;
+    private final Runnable homeBgShow = () -> {
+        ownBg = Backgrounds.current(getContext(), false, null);
+        if (tab == 0) showBackdrop(ownBg);
+    };
+    private final Runnable homeBgTurn = () -> {
+        homeBgDue = 0;
+        if (tab != 0 || !isShown()) return;   // comes back with the next updateCards on Home
+        homeBgAt = 0;
+        if (Backgrounds.on(getContext())) {   // the next of yours: shown once it's built (homeBgShow)
+            Backgrounds.current(getContext(), true, homeBgShow);
+            timeHomeBg();
+            return;
+        }
+        showBackdrop(homeBackground());
+    };
+
+    /** Home with your images: shows the one built (once; showBackdrop ignores the same one) and says so. */
+    private boolean ownBgShown() {
+        if (tab != 0 || !ownBgOn) return false;
+        if (ownBg != null) showBackdrop(ownBg);
+        return true;
+    }
+
+    /** Your images' timer, unless one is already set (Handler.hasCallbacks is Android 10+). */
+    private void timeHomeBg() {
+        if (homeBgDue > SystemClock.uptimeMillis()) return;
+        handler.removeCallbacks(homeBgTurn);
+        handler.postDelayed(homeBgTurn, homeBgMs());
+        homeBgDue = SystemClock.uptimeMillis() + homeBgMs();
+    }
+
+    /** Home's background now: yours, else a title's (the one picked, or a new random one when due, gone or none). */
+    private Backdrop homeBackground() {
+        if (Prefs.BG_OFF.equals(Prefs.bgSource())) return null;   // Home Settings > Backgrounds: none
+        if (Backgrounds.on(getContext())) {
+            Backdrop own = Backgrounds.current(getContext(), false, homeBgShow);   // the first: shown once it's built
+            timeHomeBg();
+            return own;
+        }
+        List<Recs.Pick> ready = new ArrayList<>();
+        for (Recs.Pick p : bentoPool) if (recs.backdrop(p) != null) ready.add(p);
+        long now = SystemClock.uptimeMillis();
+        int cur = homeBgPick == null ? -1 : ready.indexOf(homeBgPick);
+        if (cur < 0 || homeBgAt == 0 || now - homeBgAt >= homeBgMs()) {
+            int next = HomeNav.nextBackground(ready.size(), cur, bgRandom.nextDouble());
+            homeBgPick = next < 0 ? null : ready.get(next);
+            homeBgAt = now;
+            handler.removeCallbacks(homeBgTurn);
+            if (homeBgPick != null) handler.postDelayed(homeBgTurn, homeBgMs());
+        }
+        return homeBgPick == null ? null : recs.backdrop(homeBgPick);
+    }
+
     /** In the grid, the frosted background shows the focused card's artwork (crossfading, as between tabs). */
     private void followCard() {
         if ((moodsOn() && !onTitles()) || !bento() || cardIndex >= cards.size()) return;   // the moods: only on the titles
+        if (tab == 0) return;   // Home 2.0: the random background stays put (homeBackground)
         Backdrop b = recs.backdrop(cards.get(cardIndex));
         if (b != null) {
             showBackdrop(b);
@@ -9393,10 +9621,17 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
         if (reveal < 1 || !drawBentoPlate(c, i, p, b, true)) paintBentoCard(c, i, p, b, false);
         if (bentoMorph.value < 1 && i >= contShown) drawShapeFade(c, i, p, b);   // poster ↔ landscape, while sliding
-        boolean resumeCard = i < contShown;   // Continue Watching: art only at rest; shade, icon, bar and name on focus
-        if (resumeCard && f > 0.01f) drawResumeChrome(c, i, p, f);
-        if (!resumeCard || f > 0.01f) drawCardTitle(c, i, p, f);   // over the cached card: it rests at the bottom and rises with focus
-        if (f > 0.01f) drawCardDetails(c, i, f * reveal);
+        boolean resumeCard = i < contShown;   // Continue Watching
+        if (isHero(i)) {
+            // Home 2.0's hero: its name and line with the focus, coming in as a slide settles (no layer).
+            drawHeroChip(c, i);   // "New movie", "Top 10", "New season": always, beside the service's icon
+            drawHeroInfo(c, i, p, f * Ui.clamp((bentoMorph.value - 0.6f) / 0.4f));
+        } else if (resumeCard) {
+            drawContInfo(c, i, p, f);   // Home 2.0: the name at rest; play and progress with the focus
+        } else {
+            drawCardTitle(c, i, p, f);   // over the cached card: it rests at the bottom and rises with focus
+            if (f > 0.01f) drawCardDetails(c, i, f * reveal);
+        }
         if (reveal < 1) c.restore();   // the fade-in layer
         c.restore();
         if (f > 0.01f) {
@@ -9408,7 +9643,6 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             border.setStrokeWidth(CARD_RING * k);
             c.drawRoundRect(tmp, rr, rr, border);
             border.setStrokeWidth(2 * k);
-            if (i < contShown) drawPlayDisc(c, cx, cy - base.height() * s * 0.08f, f * reveal);
         }
     }
 
@@ -9433,32 +9667,124 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         return Discover.get(getContext()).card(p.clean, true, Math.round(bw), Math.round(bh), -1);
     }
 
-    /** A focused Continue card's shade, app icon and progress bar, fading in with the focus `f`. */
-    private void drawResumeChrome(Canvas c, int i, Recs.Pick p, float f) {
-        RectF base = cardRects[i];
-        int layer = c.saveLayerAlpha(base.left, base.top, base.right, base.bottom, Math.round(255 * f));
-        clip.reset();
-        clip.addRoundRect(base, cardRadius(i), cardRadius(i), Path.Direction.CW);
-        c.clipPath(clip);
-        if (bentoShades[i] != null) {
-            shadeMatrix.setTranslate(0, base.top);
-            bentoShades[i].setLocalMatrix(shadeMatrix);
-            fill.setColor(0xFF000000);
-            fill.setShader(bentoShades[i]);
-            c.drawRect(base, fill);
-            fill.setShader(null);
+    // MARK: - Home 2.0's hero and Continue Watching cards: art at rest; the text comes with the focus
+
+    private TextPaint heroTitlePaint;
+    private LinearGradient heroShade, contShade;
+    private final Matrix heroShadeM = new Matrix(), contShadeM = new Matrix();
+
+    private boolean isHero(int i) {
+        return tab == 0 && bento() && i == contShown && i < cards.size() && bentoBig[i];
+    }
+
+    /**
+     * The focused hero (`f`: its focus, 0 to 1): a shade from the bottom, the name and its line (rating, season or
+     * movie: Recs.cardLine), fading in with the focus. Nothing at rest: the art alone. Plain draws, no layer.
+     */
+    private void drawHeroInfo(Canvas c, int i, Recs.Pick p, float f) {
+        if (f <= 0.01f) return;
+        RectF r = cardRects[i];
+        v1Paints();
+        if (heroShade == null) {
+            // From the bottom only, neutral black: under the name and its line, nothing in the corners or the picture
+            // above (a diagonal one darkened the bottom right).
+            heroShade = new LinearGradient(0, 0, 0, 1, new int[] {0x00000000, 0x00000000, 0x8C000000},
+                    new float[] {0, 0.5f, 1}, Shader.TileMode.CLAMP);
+            heroTitlePaint = new TextPaint(v1TitleBig);
         }
-        Bitmap art = cardIcon(p);
-        float pad = 20 * k;
-        if (art != null) drawRoundIcon(c, art, base.left + pad, base.top + pad, 40 * k);
-        if (p.progress > 0) {   // how far in (Watch Next's place): a thin ivory bar along the bottom
-            float y = base.bottom - 4 * k;
-            fill.setColor(0x40FFFFFF);
-            c.drawRect(base.left, y, base.right, base.bottom, fill);
-            fill.setColor(0xFFF3EDE2);
-            c.drawRect(base.left, y, base.left + base.width() * Math.min(1, p.progress), base.bottom, fill);
+        heroShadeM.setScale(r.width(), r.height());
+        heroShadeM.postTranslate(r.left, r.top);
+        heroShade.setLocalMatrix(heroShadeM);
+        fill.setColor(0xFF000000);
+        fill.setShader(heroShade);
+        fill.setAlpha(Math.round(255 * f));
+        c.drawRoundRect(r, cardRadius(i), cardRadius(i), fill);
+        fill.setShader(null);
+        fill.setAlpha(255);
+        float pad = 32 * k, base = r.bottom - pad, textW = r.width() - 2 * pad;
+        String line = i < bentoLines.length ? bentoLines[i] : "";
+        if (line.isEmpty()) line = "movie".equals(p.kind) ? Ui.tr("Movie") : "tv".equals(p.kind) ? Ui.tr("Series") : "";
+        if (!line.isEmpty()) {
+            int old = v1Meta.getAlpha();
+            v1Meta.setAlpha(Math.round(old * f));
+            drawMetaLine(c, line, r.left + pad, base, v1Meta, textW, f);
+            v1Meta.setAlpha(old);
+            base -= 34 * k;
         }
-        c.restoreToCount(layer);
+        fitTitle(i, p);
+        heroTitlePaint.setTextSize(titleSize[i]);
+        heroTitlePaint.setAlpha(Math.round(255 * f));
+        c.drawText(titleShort[i], r.left + pad, base, heroTitlePaint);
+        drawPlayCorner(c, r, 16 * k, f);
+    }
+
+    /** The focused card's ivory play disc, top right (`pad` in from the corner), growing in from 90% with `f`. */
+    private void drawPlayCorner(Canvas c, RectF r, float pad, float f) {
+        float d = 52 * k * (0.9f + 0.1f * f), cx = r.right - pad - 26 * k, cy = r.top + pad + 26 * k;
+        // Home 2.0 (design "Icons B"): a glossy white disc, 3D, the play icon on it in black.
+        tmp.set(cx - d / 2, cy - d / 2 + 4 * k, cx + d / 2, cy + d / 2 + 4 * k);
+        shadowDeep.setColor(Ui.alpha(0xFF000000, 0.45f * f));
+        shadows.drawCached(c, tmp, d / 2, 12 * k, shadowDeep);
+        Gloss.disc(c, cx, cy, d / 2, k, f);
+        Gloss.icon(c, getContext(), "play", cx + 2 * k, cy, 22 * k, k, f);
+    }
+
+    /** The hero's chip (Recs.labelText: what the data proves), at the top beside the service's icon, as on the grid. */
+    private void drawHeroChip(Canvas c, int i) {
+        String chip = i < bentoChips.length ? bentoChips[i] : "";
+        if (chip == null || chip.isEmpty()) return;
+        RectF r = cardRects[i];
+        float pad = 16 * k, iconD = 48 * k;
+        feedPaints();
+        bentoChip(c, r.left + pad + iconD + 12 * k, r.top + pad + iconD / 2, chip);
+    }
+
+    /**
+     * A Continue Watching card: at rest the art and its name over a soft shade; focused (`f`), an ivory play disc and
+     * how far in (the line and the bar) fade in. No app icons or other buttons. Plain draws, nothing allocated.
+     */
+    private void drawContInfo(Canvas c, int i, Recs.Pick p, float f) {
+        RectF r = cardRects[i];
+        v1Paints();
+        float rad = cardRadius(i), pad = 18 * k;
+        if (contShade == null) contShade = new LinearGradient(0, 0, 0, 1, new int[] {0x001E1226, 0x261E1226, 0xCC1E1226},
+                new float[] {0, 0.5f, 1}, Shader.TileMode.CLAMP);
+        contShadeM.setScale(1, r.height());
+        contShadeM.postTranslate(0, r.top);
+        contShade.setLocalMatrix(contShadeM);
+        fill.setColor(0xFF000000);
+        fill.setShader(contShade);
+        c.drawRoundRect(r, rad, rad, fill);
+        fill.setShader(null);
+
+        float base = r.bottom - pad - 4 * k;
+        String line = i < bentoLines.length ? bentoLines[i] : "";
+        if (f > 0.01f && !line.isEmpty()) {   // how far in ("S1 E3 · 6% watched"), with the focus
+            int old = v1ContMeta.getAlpha();
+            v1ContMeta.setAlpha(Math.round(old * f));
+            drawMetaLine(c, line, r.left + pad, base, v1ContMeta, r.width() * 0.62f, f);
+            v1ContMeta.setAlpha(old);
+        }
+        base -= 26 * k * Ui.clamp(f);   // the name rises to make room for the line
+        fitTitle(i, p);
+        v1ContTitle.setTextSize(titleSize[i]);
+        c.drawText(titleShort[i], r.left + pad, base, v1ContTitle);
+        if (f <= 0.01f) return;
+
+        drawPlayCorner(c, r, pad, f);
+        if (p.progress > 0) {   // a thin line along the bottom, inside the corners
+            c.save();
+            clip.reset();
+            clip.addRoundRect(r, rad, rad, Path.Direction.CW);
+            c.clipPath(clip);
+            float y = r.bottom - 4 * k;
+            fill.setColor(Ui.alpha(0x40FFFFFF, f));
+            c.drawRect(r.left, y, r.right, r.bottom, fill);
+            fill.setColor(Ui.alpha(0xFFF6F2EC, f));
+            c.drawRect(r.left, y, r.left + r.width() * Math.min(1, p.progress), r.bottom, fill);
+            c.restore();
+        }
+        fill.setColor(0xFF000000);
     }
 
     private final Map<Bitmap, Bitmap> softCopies = new java.util.WeakHashMap<>();
@@ -9531,7 +9857,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
         shadeMatrix.setTranslate(0, base.top);
         bentoShades[i].setLocalMatrix(shadeMatrix);
-        if (!resume) {   // Continue Watching's shade comes with the focus (drawResumeChrome)
+        if (!resume && !isHero(i)) {   // Continue Watching and the hero draw their own shade, with the focus
             fill.setColor(0xFF000000);
             fill.setShader(bentoShades[i]);
             c.drawRect(base, fill);
@@ -9539,7 +9865,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
         float pad = (resume ? 20 : 16) * k, iconD = (big ? 48 : resume ? 40 : 36) * k;
         Bitmap art = cardIcon(p);
-        if (art != null) drawRoundIcon(c, art, base.left + pad, base.top + pad, iconD);   // Continue Watching's too, at rest
+        if (art != null) drawRoundIcon(c, art, base.left + pad, base.top + pad, iconD);   // the service's icon: one on every card
         if (withTitle && !resume) drawCardTitle(c, i, p, 0);
         c.restore();
     }
@@ -9742,29 +10068,6 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         border.setStrokeWidth(2 * k);
     }
 
-    private android.graphics.RadialGradient playGloss;
-    private final Matrix playGlossM = new Matrix();
-
-    /** The focused Continue Watching card's play button: a 72 px ivory 3D disc (lit from the top left) and its shadow. */
-    private void drawPlayDisc(Canvas c, float x, float y, float f) {
-        float d = 72 * k * (0.9f + 0.1f * f);   // grows in from 90% (never from nothing)
-        tmp.set(x - d / 2, y - d / 2 + 16 * k * f, x + d / 2, y + d / 2 + 16 * k * f);
-        shadowDeep.setColor(Ui.alpha(0xFF000000, 0.55f * f));
-        shadows.drawCached(c, tmp, d / 2, DEEP_BLUR * k, shadowDeep);
-        if (playGloss == null) playGloss = new android.graphics.RadialGradient(-0.15f, -0.22f, 0.75f, new int[] {0xFFFFFFFF, 0xFFF3EDE2, 0xFFCBC1B0},
-                new float[] {0, 0.45f, 1}, Shader.TileMode.CLAMP);
-        playGlossM.setScale(d, d);
-        playGlossM.postTranslate(x, y);
-        playGloss.setLocalMatrix(playGlossM);
-        fill.setColor(0xFF000000);
-        fill.setShader(playGloss);
-        fill.setAlpha(Math.round(255 * f));
-        c.drawCircle(x, y, d / 2, fill);
-        fill.setShader(null);
-        fill.setAlpha(255);
-        Symbols.draw(getContext(), c, "play", x + 3 * k, y, d * 0.42f, Ui.alpha(0xFF141413, f));
-    }
-
     /** A resting Home card from the shared cache (a name that doesn't fit is left out: it's drawn over it). */
     private boolean drawBentoPlate(Canvas c, int i, Recs.Pick p, Backdrop b, boolean overflow) {
         long sig = plateSig(i, p, b) * 31 + (overflow ? 1 : 0);
@@ -9927,7 +10230,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
                     break;
                 }
                 if (bento() && tab == 0 && cardIndex >= contShown && dx != 0 && dy == 0) {
-                    slideBento(dx);   // the large card keeps the focus: the titles slide through it
+                    slideBento(dx);   // the hero keeps the focus: the titles slide through it
                     return true;
                 }
                 if (bento()) {

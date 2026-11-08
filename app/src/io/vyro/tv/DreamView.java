@@ -300,6 +300,17 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
                 ownList.add(p);
             }
         }
+        // Home Settings > Backgrounds > Show in the screensaver: Home's own photos too.
+        if (Prefs.bgSaver()) {
+            for (File f : Backgrounds.files(getContext())) {
+                Recs.Pick p = new Recs.Pick();
+                p.kind = "photo";
+                p.id = f.getAbsolutePath().hashCode();
+                p.title = "";
+                p.backdrop = f.getAbsolutePath();
+                ownList.add(p);
+            }
+        }
         if (!ownList.isEmpty()) java.util.Collections.shuffle(ownList);
         return ownList;
     }

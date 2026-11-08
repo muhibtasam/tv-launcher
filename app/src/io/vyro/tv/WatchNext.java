@@ -86,6 +86,17 @@ final class WatchNext {
             Item it = i.next();
             if (off.contains(it.pkg) || ContinueLogic.stillHidden(hidden, hideKey(it), it.engaged, it.position)) i.remove();
         }
+        // Apps that publish a "Continue watching" channel (Stremio…) give no engagement time, so their titles sorted
+        // last however recently you watched. Their row lists the latest first: its first title takes the time the app
+        // was last on screen (Android's usage stats); the rest stay undated, after the dated ones.
+        Map<String, Long> used = null;
+        Set<String> dated = new HashSet<>();
+        for (Item it : all) {   // still in each list's own order
+            if (it.engaged > 0 || !dated.add(it.pkg)) continue;
+            if (used == null) used = lastUsed(c);
+            Long t = used.get(it.pkg);
+            if (t != null && t > 0) it.engaged = t;
+        }
         Collections.sort(all, (a, b) -> Long.compare(b.engaged, a.engaged));
         List<Item> out = new ArrayList<>();
         Map<String, Integer> perApp = new HashMap<>();
@@ -156,6 +167,24 @@ final class WatchNext {
         } catch (RuntimeException e) {
             AppLog.w("continue watching apps " + uri + ": " + e.getMessage());
         }
+    }
+
+    /** When each app was last on screen (the past week), by package; empty without usage access. */
+    private static Map<String, Long> lastUsed(Context c) {
+        Map<String, Long> out = new HashMap<>();
+        try {
+            android.app.usage.UsageStatsManager um =
+                    (android.app.usage.UsageStatsManager) c.getSystemService(Context.USAGE_STATS_SERVICE);
+            if (um == null) return out;
+            long now = System.currentTimeMillis();
+            Map<String, android.app.usage.UsageStats> stats = um.queryAndAggregateUsageStats(now - 7L * 24 * 3600_000L, now);
+            if (stats != null) for (Map.Entry<String, android.app.usage.UsageStats> e : stats.entrySet()) {
+                out.put(e.getKey(), e.getValue().getLastTimeUsed());
+            }
+        } catch (RuntimeException e) {
+            AppLog.w("continue watching: no usage times (" + e.getMessage() + ")");
+        }
+        return out;
     }
 
     private static String appName(Context c, String pkg) {

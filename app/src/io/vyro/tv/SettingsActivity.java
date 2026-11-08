@@ -34,6 +34,7 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -151,7 +152,7 @@ public class SettingsActivity extends Activity {
     static final class SettingsView extends View implements Choreographer.FrameCallback {
         private static final int MAIN = 0, HOME_CHOICE = 1, HOME_SETTINGS = 2, REMOTE_KEYS = 3, PICKER = 4, SHELF_EDIT = 5,
                 POWER = 6, TMDB_KEY = 7, PICKS = 8, PICK_FROM = 9, WATCH_APPS = 10,
-                TABS = 11;
+                TABS = 11, BACKGROUNDS = 12;
         private static final float LIST_ROW_H = 68, LIST_ROW_GAP = 6;
         private static final int PICK_VISIBLE = 9;
         private static final float LIST_X = 1000, LIST_R = 1824, LIST_TOP = 186, ROW_GAP = 8, CHOICE_H = 104;
@@ -390,6 +391,11 @@ public class SettingsActivity extends Activity {
                     return row == 0 && keyHelp != null ? keyLabel(keyRowIds[0]) + ". " + keyHelp : keyLabel(keyRowIds[row]);
                 case TABS:
                     return row < 3 ? tabLabels()[row] + ", " + tabValues()[row] : "";
+                case BACKGROUNDS: {
+                    if (row >= bgRowIds.length) return "";
+                    String value = bgValue(bgRowIds[row]);
+                    return bgLabel(bgRowIds[row]) + (value.isEmpty() || value.equals("›") ? "" : ", " + value);
+                }
                 default:
                     return "";
             }
@@ -418,6 +424,7 @@ public class SettingsActivity extends Activity {
             startedAt = SystemClock.uptimeMillis();
             lastNanos = 0;
             handler.post(poll);
+            if (screen == BACKGROUNDS) handler.post(bgPoll);   // the drive's folder, looked for again
             if (watchGrantPending) handler.postDelayed(askWatch, WATCH_GRANT_MS);
             invalidate();
             spoken.readAgain();
@@ -435,6 +442,12 @@ public class SettingsActivity extends Activity {
             handler.removeCallbacks(askWatch);
             Choreographer.getInstance().removeFrameCallback(this);
             framePending = false;
+            if (bgPage != null) {   // the same for the photos' page
+                stopBgPage();
+                setBgStatus(Ui.tr("This code has expired."), false);
+                bgRowsChanged();
+            }
+            handler.removeCallbacks(bgPoll);
             if (keyPage != null) {   // the phone's page answers only while its code shows (not after Home, standby, another app)
                 stopKeyPage();
                 setKeyStatus(Ui.tr("This code has expired."), false);
@@ -553,6 +566,7 @@ public class SettingsActivity extends Activity {
                 case SHELF_EDIT: return Math.min(PICK_VISIBLE, shelfRows.size());
                 case POWER: return powerRows().length;
                 case TMDB_KEY: return keyRowIds.length;
+                case BACKGROUNDS: return bgRowIds.length;
                 case PICKS: return picksLabels().length;
                 case PICK_FROM: return Math.min(PICK_VISIBLE, services.size());
                 case WATCH_APPS: return Math.min(PICK_VISIBLE, listSize());
@@ -584,13 +598,18 @@ public class SettingsActivity extends Activity {
             float lx = 140 * k;
             white.setAlpha(255);
             tmp.set(lx, 380 * k, lx + 48 * k, 384 * k);
-            c.drawRoundRect(tmp, 2 * k, 2 * k, white);
-            c.drawText("VYRO", lx, 470 * k, title);
-            c.drawText(Ui.tr("Your TV's home screen and screensaver"), lx, 524 * k, subtitle);
-            c.drawText(versionName(getContext()).replace("VYRO ", "Version "), lx, 562 * k, version);
+            if (screen == BACKGROUNDS) {   // its code and steps where the name goes
+                drawBgSide(c);
+            } else {
+                c.drawRoundRect(tmp, 2 * k, 2 * k, white);
+                c.drawText("VYRO", lx, 470 * k, title);
+                c.drawText(Ui.tr("Your TV's home screen and screensaver"), lx, 524 * k, subtitle);
+                c.drawText(versionName(getContext()).replace("VYRO ", "Version "), lx, 562 * k, version);
+            }
 
             if (screen == MAIN) drawMain(c, seconds); else if (screen == HOME_CHOICE) drawChoice(c); else if (screen == PICKER) drawPicker(c); else if (screen == SHELF_EDIT) drawShelfEditor(c);
             else if (screen == TMDB_KEY) drawKey(c);
+            else if (screen == BACKGROUNDS) drawBg(c);
             else if (screen == PICK_FROM) drawServices(c);
             else if (screen == WATCH_APPS) drawWatchApps(c);
             else drawList(c);
@@ -935,6 +954,8 @@ public class SettingsActivity extends Activity {
                 case KeyEvent.KEYCODE_DPAD_RIGHT:
                     if (down && screen == SHELF_EDIT) {
                         moveShelfApp(e.getKeyCode() == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
+                    } else if (down && screen == BACKGROUNDS) {
+                        bgAdjust(e.getKeyCode() == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
                     } else if (down && (screen == HOME_SETTINGS || screen == REMOTE_KEYS || screen == TABS || screen == POWER || screen == PICKS || screen == PICK_FROM)) {
                         adjust(e.getKeyCode() == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
                     }
@@ -976,6 +997,8 @@ public class SettingsActivity extends Activity {
                                 screen = REMOTE_KEYS;
                             } else if (screen == TMDB_KEY) {
                                 closeKeyScreen();
+                            } else if (screen == BACKGROUNDS) {
+                                closeBgScreen();
                             } else if (screen == PICKS) {
                                 focus = PICKS_ROW;
                                 pickScroll = 0;
@@ -1009,14 +1032,14 @@ public class SettingsActivity extends Activity {
 
         private static final String[] UNITS = {"auto", "C", "F"}, THEMES = {"auto", "light", "dark"},
                 CLOCKS = {"auto", "24", "12"};
-        /** Home Settings: language, temperature, theme, clock, my photos, sounds, top of the screen, picks, Continue
+        /** Home Settings: language, temperature, theme, clock, my photos, backgrounds, sounds, top of the screen, picks, Continue
          *  Watching's apps, watch from the screensaver, Android apps, status icons, Recent Apps, weather, city, forecast,
          *  now playing, Home Assistant (only on builds with its address), quotes, one row per coin, then the TMDB and Watchmode keys and
          *  updates (the last row). */
-        private static final int CLOCK_ROW = 3, PHOTOS_ROW = 4, TOP_ROW = 6, PICKS_ROW = 7, WATCH_ROW = 8,
-                SAVER_ROW = 9, ANDROID_APPS_ROW = 10, STATUS_ICONS_ROW = 11, RECENTS_ROW = 12, POWER_ON_ROW = 13,
-                WEATHER_ROW = 14, CITY_ROW = 15, FORECAST_ROW = 16, PLAYING_ROW = 17, HOME_ROW = Config.HOME_ASSISTANT ? 18 : -1,
-                QUOTES_ROW = Config.HOME_ASSISTANT ? 19 : 18, COIN_ROWS = QUOTES_ROW + 1;
+        private static final int CLOCK_ROW = 3, PHOTOS_ROW = 4, BACKGROUNDS_ROW = 5, SOUNDS_ROW = 6, TOP_ROW = 7, PICKS_ROW = 8,
+                WATCH_ROW = 9, SAVER_ROW = 10, ANDROID_APPS_ROW = 11, STATUS_ICONS_ROW = 12, RECENTS_ROW = 13, POWER_ON_ROW = 14,
+                WEATHER_ROW = 15, CITY_ROW = 16, FORECAST_ROW = 17, PLAYING_ROW = 18, HOME_ROW = Config.HOME_ASSISTANT ? 19 : -1,
+                QUOTES_ROW = Config.HOME_ASSISTANT ? 20 : 19, COIN_ROWS = QUOTES_ROW + 1;
         /** No "home" on Xiaomi TVs: their remote sends one Home press as a burst of presses (HomeView.BURST_MS). */
         private static final String[] RECENTS = RemoteKeys.XIAOMI ? new String[] {"off", "drawer"}
                 : new String[] {"off", "drawer", "home"};
@@ -1034,6 +1057,7 @@ public class SettingsActivity extends Activity {
             l.add(Ui.tr("Theme"));
             l.add(Ui.tr("Clock"));
             l.add(Ui.tr("My Photos"));
+            l.add(Ui.tr("Backgrounds"));
             l.add(Ui.tr("Navigation sounds"));
             l.add(Ui.tr("Continue Watching"));   // VYRO's "Top of the screen": on the Ibtzy home screen, the row under the picks
             l.add(Ui.tr("Picks"));
@@ -1161,7 +1185,8 @@ public class SettingsActivity extends Activity {
             if (ImmichPhotos.configured(getContext())) v[PHOTOS_ROW] = immichPhotosValue(photos);
             String clock = Prefs.clockFormat();
             v[CLOCK_ROW] = clock.equals("24") ? Ui.tr("24 hours") : clock.equals("12") ? Ui.tr("12 hours") : Ui.tr("Automatic");
-            v[5] = onOff(Prefs.sounds());
+            v[BACKGROUNDS_ROW] = "›";   // its own screen: where Home's photos come from, adding and removing them
+            v[SOUNDS_ROW] = onOff(Prefs.sounds());
             v[PICKS_ROW] = "›";   // opens its own screen: Picks per tab and Picks from
             v[SAVER_ROW] = onOff(Prefs.saverWatch());
             String top = Prefs.topContent();
@@ -1530,7 +1555,8 @@ public class SettingsActivity extends Activity {
                     Prefs.setClockFormat(CLOCKS[(at + dir + CLOCKS.length) % CLOCKS.length]);
                     break;
                 }
-                case 5: Prefs.setSounds(!Prefs.sounds()); break;
+                case BACKGROUNDS_ROW: return;   // OK opens its screen
+                case SOUNDS_ROW: Prefs.setSounds(!Prefs.sounds()); break;
                 case PICKS_ROW: return;
                 case SAVER_ROW: Prefs.setSaverWatch(!Prefs.saverWatch()); break;
                 case TOP_ROW: {
@@ -1959,6 +1985,338 @@ public class SettingsActivity extends Activity {
                 c.restore();
             }
         }
+
+        // MARK: - Backgrounds (Home's own photos: from a phone through BgPage's QR code, or a USB drive)
+
+        private static final int B_SOURCE = 0, B_PHOTOS = 1, B_NEW = 2, B_USB = 3, B_EVERY = 4, B_SAVER = 5;
+        private static final float BG_QR = 300, THUMB_W = 176, THUMB_H = 99, THUMB_GAP = 16;
+        private static final int THUMBS_SHOWN = 4;
+        private BgPage bgPage;
+        private Bitmap bgQr;
+        private StaticLayout bgStatus, bgSteps;
+        private int[] bgRowIds = new int[0];
+        private int bgSel;          // the photo chosen on Your photos (← →), removed with OK
+        private File bgUsb;         // a drive's Backgrounds folder, looked for every 3 s while the screen shows
+        private boolean bgCopying;
+        private final Runnable bgPoll = new Runnable() {
+            @Override public void run() {
+                if (screen != BACKGROUNDS || !running) return;
+                new Thread(() -> {
+                    File usb = Backgrounds.usbFolder();
+                    handler.post(() -> {
+                        if (screen != BACKGROUNDS) return;
+                        boolean changed = (usb == null) != (bgUsb == null);
+                        bgUsb = usb;
+                        if (changed) invalidate();
+                        handler.postDelayed(bgPoll, 3000);
+                    });
+                }, "Backgrounds USB").start();
+            }
+        };
+
+        private static String bgLabel(int id) {
+            switch (id) {
+                case B_SOURCE: return Ui.tr("On Home");
+                case B_PHOTOS: return Ui.tr("bg|Your photos");
+                case B_NEW: return Ui.tr("New code");
+                case B_USB: return Ui.tr("Add from USB drive");
+                case B_EVERY: return Ui.tr("Change every");
+                default: return Ui.tr("Show in the screensaver");
+            }
+        }
+
+        private String bgValue(int id) {
+            switch (id) {
+                case B_SOURCE: {
+                    String s = Prefs.bgSource();
+                    return s.equals(Prefs.BG_TITLES) ? Ui.tr("Title artwork") : s.equals(Prefs.BG_OFF) ? Ui.tr("Off") : Ui.tr("bg|Your photos");
+                }
+                case B_PHOTOS: {
+                    int n = Backgrounds.files(getContext()).size();
+                    return n == 0 ? Ui.tr("photos|None") : Ui.plural("plural|one:{n} photo|other:{n} photos", n);
+                }
+                case B_NEW: return "";
+                case B_USB: return bgCopying ? Ui.tr("Sending…") : bgUsb == null ? Ui.tr("No drive") : "›";
+                case B_EVERY: return Ui.plural("plural|one:{n} minute|other:{n} minutes", Prefs.bgMinutes());
+                default: return onOff(Prefs.bgSaver());
+            }
+        }
+
+        private void openBgScreen() {
+            screen = BACKGROUNDS;
+            pickScroll = 0;
+            focus = 0;
+            bgSel = 0;
+            bgStatus = null;
+            String steps = Ui.tr("Scan this code with your phone, pick photos and send them. Same Wi-Fi as the TV.");
+            int width = Math.round((1000 - 140 - BG_QR - 40 - 40) * k);
+            bgSteps = StaticLayout.Builder.obtain(steps, 0, steps.length(), notice, width).setLineSpacing(6 * k, 1).build();
+            startBgPage();
+            handler.removeCallbacks(bgPoll);
+            handler.post(bgPoll);
+        }
+
+        private void closeBgScreen() {
+            stopBgPage();
+            handler.removeCallbacks(bgPoll);
+            showSettingsRow(BACKGROUNDS_ROW);
+        }
+
+        private void startBgPage() {
+            stopBgPage();
+            InetAddress lan = KeyPage.lanAddress(getContext());
+            if (lan == null) {
+                setBgStatus(Ui.tr("The TV isn't on a network: connect it, or use a USB drive."), true);
+            } else {
+                try {
+                    bgPage = new BgPage(getContext(), lan, bgListener);
+                    bgQr = qrBitmap(Qr.encode(bgPage.url));
+                    activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    setBgStatus(Ui.tr("Waiting for your phone. The code works for 5 minutes."), false);
+                } catch (IOException | RuntimeException e) {
+                    stopBgPage();
+                    setBgStatus(Ui.trf("Error: {error}.", "error", e.getMessage()), true);
+                }
+            }
+            bgRowsChanged();
+        }
+
+        void stopBgPage() {
+            if (bgPage != null) bgPage.close();
+            bgPage = null;
+            bgQr = null;
+            if (keyPage == null) activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+
+        private final BgPage.Listener bgListener = new BgPage.Listener() {
+            @Override public void added(int sent) {
+                handler.post(() -> {
+                    setBgStatus(Ui.plural("plural|one:{n} photo sent to the TV.|other:{n} photos sent to the TV.", sent), false);
+                    invalidate();
+                    spoken.focusMoved();
+                });
+            }
+
+            @Override public void closed(BgPage page, boolean expired) {
+                handler.post(() -> {
+                    if (page != bgPage) return;
+                    stopBgPage();
+                    if (expired) setBgStatus(Ui.tr("This code has expired."), false);
+                    bgRowsChanged();
+                });
+            }
+        };
+
+        /** The rows for now: New code only once the last one is used up. */
+        private void bgRowsChanged() {
+            int was = focus < bgRowIds.length ? bgRowIds[focus] : B_SOURCE;
+            int[] ids = new int[6];
+            int n = 0;
+            ids[n++] = B_SOURCE;
+            ids[n++] = B_PHOTOS;
+            if (bgPage == null) ids[n++] = B_NEW;
+            ids[n++] = B_USB;
+            ids[n++] = B_EVERY;
+            ids[n++] = B_SAVER;
+            bgRowIds = java.util.Arrays.copyOf(ids, n);
+            if (screen != BACKGROUNDS) return;
+            focus = 0;
+            for (int i = 0; i < n; i++) if (ids[i] == was) focus = i;
+            invalidate();
+            spoken.focusMoved();
+        }
+
+        private void setBgStatus(String text, boolean error) {
+            int width = Math.round((1000 - 140 - 40) * k);
+            TextPaint paint = error ? new TextPaint(warn) : notice;
+            bgStatus = StaticLayout.Builder.obtain(text, 0, text.length(), paint, width)
+                    .setMaxLines(2).setEllipsize(TextUtils.TruncateAt.END).build();
+            if (screen == BACKGROUNDS && running) announceForAccessibility(text);
+            invalidate();
+        }
+
+        private int bgRow() {
+            return focus < bgRowIds.length ? bgRowIds[focus] : -1;
+        }
+
+        /** ← → on a row: the choice before or after, the photo beside (Your photos), on or off. */
+        private void bgAdjust(int dir) {
+            switch (bgRow()) {
+                case B_SOURCE: {
+                    int at = java.util.Arrays.asList(Prefs.BG_SOURCES).indexOf(Prefs.bgSource());
+                    int n = Prefs.BG_SOURCES.length;
+                    Prefs.setBgSource(Prefs.BG_SOURCES[((at < 0 ? 0 : at) + dir + n) % n]);
+                    break;
+                }
+                case B_PHOTOS: {
+                    int n = Backgrounds.files(getContext()).size();
+                    if (n > 0) bgSel = Math.max(0, Math.min(n - 1, bgSel + dir));
+                    break;
+                }
+                case B_EVERY: {
+                    int at = 0, n = Prefs.BG_MINUTES.length;
+                    for (int i = 0; i < n; i++) if (Prefs.BG_MINUTES[i] == Prefs.bgMinutes()) at = i;
+                    Prefs.setBgMinutes(Prefs.BG_MINUTES[(at + dir + n) % n]);
+                    break;
+                }
+                case B_SAVER: Prefs.setBgSaver(!Prefs.bgSaver()); break;
+                default: return;
+            }
+            HomeData.get(getContext()).settingsChanged();
+            invalidate();
+            spoken.focusMoved();
+        }
+
+        private void bgActivate() {
+            switch (bgRow()) {
+                case B_PHOTOS: askRemoveBackground(); return;
+                case B_NEW: startBgPage(); return;
+                case B_USB: copyFromUsb(); return;
+                default: bgAdjust(1);
+            }
+        }
+
+        /** OK on Your photos: asks, then deletes the photo chosen. */
+        private void askRemoveBackground() {
+            List<File> all = Backgrounds.files(getContext());
+            if (all.isEmpty()) return;
+            File f = all.get(Math.min(bgSel, all.size() - 1));
+            AlertDialog dialog = new AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                    .setTitle(Ui.plural("plural|one:Remove {n} photo?|other:Remove {n} photos?", 1))
+                    .setPositiveButton(Ui.tr("Remove"), (d, which) -> {
+                        Backgrounds.remove(getContext(), f);
+                        bgSel = Math.max(0, Math.min(bgSel, Backgrounds.files(getContext()).size() - 1));
+                        HomeData.get(getContext()).settingsChanged();
+                        invalidate();
+                        spoken.focusMoved();
+                    })
+                    .setNegativeButton(Ui.tr("Cancel"), null)
+                    .show();
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();   // one stray OK keeps it
+        }
+
+        /** OK on Add from USB drive: copies the drive's Backgrounds folder in (off the UI thread), then says how many. */
+        private void copyFromUsb() {
+            File from = bgUsb;
+            if (from == null) {
+                setBgStatus(Ui.tr("No photos in a Backgrounds folder on the drive."), true);
+                return;
+            }
+            if (bgCopying) return;
+            bgCopying = true;
+            invalidate();
+            Context app = getContext().getApplicationContext();
+            new Thread(() -> {
+                int n = Backgrounds.importFrom(app, from);
+                handler.post(() -> {
+                    bgCopying = false;
+                    setBgStatus(Ui.plural("plural|one:Copied {n} photo from the drive.|other:Copied {n} photos from the drive.", n), false);
+                    HomeData.get(getContext()).settingsChanged();
+                    spoken.focusMoved();
+                });
+            }, "Backgrounds copy").start();
+        }
+
+        /** The left side: the screen's name, what it does, the code with its steps, the address, the status. */
+        private void drawBgSide(Canvas c) {
+            float lx = 140 * k;
+            white.setAlpha(255);
+            tmp.set(lx, 230 * k, lx + 48 * k, 234 * k);
+            c.drawRoundRect(tmp, 2 * k, 2 * k, white);
+            c.drawText(Ui.tr("Backgrounds"), lx, 320 * k, title);
+            c.drawText(Ui.tr("Your photos behind Home, one at random, blurred."), lx, 374 * k, subtitle);
+            float top = 430 * k;
+            Bitmap qr = bgQr;
+            if (qr != null) {
+                int n = qr.getWidth();
+                float side = Math.max(1, (int) (BG_QR * k / n)) * n;   // whole pixels per module
+                tmp.set(lx, top, lx + side, top + side);
+                c.drawBitmap(qr, null, tmp, qrPaint);
+            } else {
+                tmp.set(lx, top, lx + BG_QR * k, top + BG_QR * k);
+                c.drawRoundRect(tmp, 12 * k, 12 * k, qrSlot);
+            }
+            if (bgSteps != null) {
+                c.save();
+                c.translate(lx + (BG_QR + 40) * k, top);
+                bgSteps.draw(c);
+                c.restore();
+            }
+            float below = top + BG_QR * k + 50 * k;
+            BgPage page = bgPage;
+            if (page != null) {
+                c.drawText(Ui.tr("No camera? On a phone on the same network, open:"), lx, below, notice);
+                c.drawText(page.url, lx, below + 38 * k, keyUrl);
+                below += 90 * k;
+            }
+            StaticLayout status = bgStatus;
+            if (status != null) {
+                c.save();
+                c.translate(lx, below - status.getLineBaseline(0));
+                status.draw(c);
+                c.restore();
+            }
+        }
+
+        /** The right side: the rows, then your photos (the one chosen ringed while Your photos is focused). */
+        private void drawBg(Canvas c) {
+            float x = LIST_X * k + 30 * k, pitch = LIST_ROW_H + LIST_ROW_GAP;
+            c.drawText(Ui.tr("Home Settings"), x, (LIST_TOP - 24) * k, keyHeading);
+            int rows = rowCount();
+            for (int i = 0; i < rows; i++) {
+                float y = (LIST_TOP + 20 + i * pitch) * k;
+                rowRect.set(LIST_X * k, y, LIST_R * k, y + LIST_ROW_H * k);
+                float f = drawRowBackground(c, i);
+                rowLabel.setColor(blend(0xF2FFFFFF, INK, f));
+                rowValue.setColor(blend(0xB3FFFFFF, 0xB31C1C1E, f));
+                float base = rowRect.centerY() + Ui.halfCap(rowLabel);
+                c.drawText(bgLabel(bgRowIds[i]), rowRect.left + 30 * k, base, rowLabel);
+                String value = bgValue(bgRowIds[i]);
+                float right = rowRect.right - 30 * k;
+                if (value.equals("›")) {
+                    float cw = Symbols.width(getContext(), "chevron_right", 22 * k);
+                    Symbols.draw(getContext(), c, "chevron_right", right - cw / 2, rowRect.centerY(), 22 * k, blend(0x66FFFFFF, 0x991C1C1E, f));
+                } else {
+                    c.drawText(value, right, base, rowValue);
+                }
+            }
+            List<File> all = Backgrounds.files(getContext());
+            float top = (LIST_TOP + 20 + rows * pitch + 20) * k;
+            if (all.isEmpty()) {
+                c.drawText(Ui.tr("With none, Home shows the titles' artwork."), x, top + 30 * k, notice);
+                return;
+            }
+            bgSel = Math.min(bgSel, all.size() - 1);
+            boolean picking = bgRow() == B_PHOTOS;
+            int first = Math.max(0, Math.min(bgSel - THUMBS_SHOWN + 1, all.size() - THUMBS_SHOWN));
+            first = Math.min(first, bgSel);
+            for (int i = 0; i < THUMBS_SHOWN && first + i < all.size(); i++) {
+                File f = all.get(first + i);
+                float tx = LIST_X * k + i * (THUMB_W + THUMB_GAP) * k;
+                tmp.set(tx, top, tx + THUMB_W * k, top + THUMB_H * k);
+                Bitmap t = Backgrounds.thumb(getContext(), f, Math.round(THUMB_W * k), this::invalidate);
+                c.save();
+                c.clipRect(tmp);
+                if (t != null) {
+                    float s = Math.max(tmp.width() / t.getWidth(), tmp.height() / t.getHeight());
+                    float dw = t.getWidth() * s, dh = t.getHeight() * s;
+                    thumbRect.set(tmp.centerX() - dw / 2, tmp.centerY() - dh / 2, tmp.centerX() + dw / 2, tmp.centerY() + dh / 2);
+                    c.drawBitmap(t, null, thumbRect, thumbPaint);
+                } else {
+                    c.drawRect(tmp, qrSlot);
+                }
+                c.restore();
+                if (picking && first + i == bgSel) {
+                    ivoryRing.setAlpha(255);
+                    tmp.inset(-5.5f * k, -5.5f * k);
+                    c.drawRoundRect(tmp, 8 * k, 8 * k, ivoryRing);
+                }
+            }
+            if (picking) c.drawText(Ui.tr("← → choose a photo, OK removes it."), x - 30 * k, top + (THUMB_H + 44) * k, notice);
+        }
+
+        private final RectF thumbRect = new RectF();
+        private final Paint thumbPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
 
         // MARK: - My Photos (sent from a computer: tools/photos.py)
 
@@ -2538,6 +2896,13 @@ public class SettingsActivity extends Activity {
                 return;
             } else if (screen == HOME_SETTINGS && (pickScroll + focus == keyRow() || pickScroll + focus == watchmodeRow())) {
                 openKeyScreen(pickScroll + focus == watchmodeRow());
+            } else if (screen == HOME_SETTINGS && pickScroll + focus == BACKGROUNDS_ROW) {
+                openBgScreen();
+            } else if (screen == BACKGROUNDS) {
+                bgActivate();
+                invalidate();
+                spoken.focusMoved();
+                return;
             } else if (screen == TMDB_KEY) {
                 activateKey();
                 invalidate();

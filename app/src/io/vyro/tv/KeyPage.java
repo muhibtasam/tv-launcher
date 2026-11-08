@@ -204,7 +204,7 @@ final class KeyPage {
     }
 
     /** The request line and headers, up to the blank line; null if there are none, too many, or they come too slowly. */
-    private static String readHead(InputStream in, long deadline) throws IOException {
+    static String readHead(InputStream in, long deadline) throws IOException {
         ByteArrayOutputStream head = new ByteArrayOutputStream();
         int matched = 0, b;
         while (matched < 4 && (b = in.read()) >= 0) {
@@ -216,7 +216,7 @@ final class KeyPage {
         return matched == 4 ? head.toString(StandardCharsets.ISO_8859_1.name()) : null;
     }
 
-    private static int contentLength(String head) {
+    static int contentLength(String head) {
         for (String h : head.split("\r\n")) {
             int colon = h.indexOf(':');
             if (colon > 0 && h.substring(0, colon).trim().equalsIgnoreCase("Content-Length")) {
@@ -245,7 +245,7 @@ final class KeyPage {
         return "";
     }
 
-    private static void respond(OutputStream out, String status, String type, byte[] body) throws IOException {
+    static void respond(OutputStream out, String status, String type, byte[] body) throws IOException {
         String head = "HTTP/1.1 " + status + "\r\nContent-Type: " + type + "\r\nContent-Length: " + body.length
                 + "\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff"
                 + "\r\nConnection: close\r\n\r\n";
@@ -315,7 +315,7 @@ final class KeyPage {
         return b.append("</html>").toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    private static String esc(String s) {
+    static String esc(String s) {
         StringBuilder b = new StringBuilder(s.length() + 16);
         for (int i = 0; i < s.length(); i++) {
             char ch = s.charAt(i);
